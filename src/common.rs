@@ -18,6 +18,7 @@ pub type RTBandwidth = f64;
 
 #[derive(Clone)]
 #[derive(Debug)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct RTTask {
     pub wcet: Time,
     pub deadline: Time,
@@ -31,6 +32,7 @@ pub struct RTUtils;
 impl Time {
     const MICRO_TO_NANO: u64 = 1000;
     const MILLI_TO_NANO: u64 = 1000_000;
+    const SECS_TO_NANO: u64 = 1000_000_000;
 
     pub fn zero() -> Self {
         Self { value_ns: 0 }
@@ -112,6 +114,44 @@ impl std::ops::Div<u64> for Time {
 impl std::iter::Sum for Time {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Time::zero(), |acc, val| acc + val)
+    }
+}
+
+impl serde::Serialize for Time {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        format!("{} ns", self.value_ns).serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Time {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de> {
+        let time_string = String::deserialize(deserializer)?;
+        
+        let pieces: Vec<_> = time_string.trim().split_whitespace().collect();
+        if pieces.len() == 1 {
+            let time: u64 = pieces[0].parse()
+                .map_err(|err| serde::de::Error::custom(format!("Invalid time: {err}")))?;
+
+            Ok(Time { value_ns: time })
+        } else if pieces.len() == 2 {
+            let time: u64 = pieces[0].parse()
+                .map_err(|err| serde::de::Error::custom(format!("Invalid time: {err}")))?;
+            let unit = match pieces[1] {
+                "s" => Time::SECS_TO_NANO,
+                "ms" => Time::MILLI_TO_NANO,
+                "us" => Time::MICRO_TO_NANO,
+                "ns" => 1,
+                u => { return Err(serde::de::Error::custom(format!("Unknown time unit: {u}"))); }
+            };
+
+            Ok(Time { value_ns: time * unit })
+        } else {
+            return Err(serde::de::Error::custom("Parsing error, unknown format"));
+        }
     }
 }
 

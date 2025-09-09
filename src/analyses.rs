@@ -8,7 +8,7 @@ pub mod prelude {
 }
 
 // Single Processor analyses
-pub mod rate_monotonic;
+pub mod up_rate_monotonic;
 pub mod earliest_deadline_first;
 
 pub mod deadline_monotonic;
@@ -28,6 +28,20 @@ pub enum Error {
     NonImplicitDeadlines,
     NonConstrainedDeadlines,
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Generic(err) => write!(f, "Analysis error: {err}"),
+            Error::NotOrderedByPeriod => write!(f, "Analysis error: taskset not ordered by period"),
+            Error::NotOrderedByDeadline => write!(f, "Analysis error: taskset not ordered by deadline"),
+            Error::NonImplicitDeadlines => write!(f, "Analysis error: taskset must have implicit deadlines"),
+            Error::NonConstrainedDeadlines => write!(f, "Analysis error: taskset must have constrained deadlines"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 pub struct AnalysisUtils;
 
