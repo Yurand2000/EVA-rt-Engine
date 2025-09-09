@@ -52,17 +52,15 @@ fn comp(interval: (Time, Time), tasksubset: &[RTTask]) -> Time {
 
 // Condition 4
 fn avg_processing_load_is_met(tasksubset: &[RTTask]) -> bool {
-    let period_lcm = tasksubset.iter()
-        .map(|task| task.period.value_ns)
-        .fold(1, |lcm, period| num::integer::lcm(lcm, period));
+    let hyperperiod = RTUtils::hyperperiod(tasksubset);
     
-    let avg_load: u64 = 
+    let avg_load: Time = 
         tasksubset.iter()
         .take(tasksubset.len() - 1)
-        .map(|task| period_lcm / task.period.value_ns * task.wcet.value_ns)
+        .map(|task| Time { value_ns: hyperperiod.value_ns / task.period.value_ns * task.wcet.value_ns })
         .sum();
 
-    avg_load < period_lcm
+    avg_load < hyperperiod
 }
 
 // Function 5
