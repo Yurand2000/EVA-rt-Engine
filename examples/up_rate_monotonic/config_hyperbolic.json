@@ -1,0 +1,5 @@
+{
+    "rate-monotonic": {
+        "typ": "hyperbolic"
+    }
+}
