@@ -123,16 +123,14 @@ This taskset is comprised of 3 tasks. The highest priority task (if using *fixed
 *References are available in the individual sub-pages*
 
 - [**Rate Monotonic**](src/analyses/up_rate_monotonic/README.md)
-- **Earliest Deadline First** - Liu & Layland (1973) [1]
-- **Deadline Monotonic** - Leung & Whitehead (1982) [3]
-- **Response Time Analysis** - Joseph & Pandya (1986) [4]
+- [**Earliest Deadline First**](src/analyses/up_earliest_deadline_first/README.md)
+- [**Deadline Monotonic**](src/analyses/up_deadline_monotonic/README.md)
+- [**Response Time Analysis**](src/analyses/response_time_analysis/README.md)
 
 ### Multi Processor Analyses
 
-- **Global Deadline Monotonic** - Bertogna, Cirinei and Lipari (2005) [5]
-- **Global Earliest Deadline First**
-    - *Implicit Deadlines* - Goossens, Funk and Baruah (2003) [6]
-    - *Constrained Deadlines* - Bertogna, Cirinei and Lipari (2009) [7]
+- [**Global Deadline Monotonic**](src/analyses/smp_dm/README.md)
+- [**Global Earliest Deadline First**](src/analyses/smp_edf/README.md)
 
 ## 📄 License
 

@@ -1,9 +1,8 @@
 # UniProcessor Rate Monotonic
 
-[**🏠 Go back to all analyses**](../../../README.md)
+[**🏠 Go back to all analyses**](../../../README.md#-available-analyses)
 
 This module checks if the **Rate Monotonic** priority assignment for **Fixed-Priority Scheduling** is suitable for the given taskset on a **UniProcessor** System.
-
 
 ### 🔑 Preconditions
 

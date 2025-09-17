@@ -10,9 +10,8 @@ pub mod prelude {
 
 // Single Processor analyses
 pub mod up_rate_monotonic;
-pub mod earliest_deadline_first;
-
-pub mod deadline_monotonic;
+pub mod up_earliest_deadline_first;
+pub mod up_deadline_monotonic;
 
 pub mod response_time_analysis;
 
