@@ -10,7 +10,7 @@ pub fn is_schedulable(taskset: &[RTTask]) -> Result<bool, Error> {
 
     // Theorem 5: let m = #Tasks, lub(Utilization) = m * (2^(1/m) - 1)
     let total_utilization = RTUtils::total_utilization(taskset);
-    let rate_monotonic_lub = (taskset.len() as f64) * (2f64.powf(taskset.len() as f64) - 1f64);
+    let rate_monotonic_lub = (taskset.len() as f64) * (2f64.powf(1f64 / taskset.len() as f64) - 1f64);
 
     Ok(total_utilization <= rate_monotonic_lub)
 }

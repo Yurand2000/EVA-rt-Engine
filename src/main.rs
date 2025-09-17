@@ -6,7 +6,11 @@ const DEFAULT_AFTER_HELP: &str = "Refer to README.md files for further documenta
 #[command(after_help=DEFAULT_AFTER_HELP)]
 struct Args {
     #[command(about, subcommand)]
-    analysis: Analyses,
+    analysis: Option<Analyses>,
+
+    /// Config file
+    #[arg(short='c', value_name="config")]
+    config_file: Option<String>,
 
     /// Taskset data file
     #[arg(short='i', value_name="filename")]
@@ -25,6 +29,7 @@ struct Args {
 }
 
 #[derive(clap::Subcommand, Debug)]
+#[derive(serde::Deserialize)]
 enum Analyses {
     /// UniProcessor Rate Monotonic
     /// 
@@ -32,6 +37,7 @@ enum Analyses {
     /// - Taskset sorted by period.
     /// - Implicit deadlines.
     #[command(name = "rate-monotonic", after_help=DEFAULT_AFTER_HELP, verbatim_doc_comment)]
+    #[serde(rename = "rate-monotonic")]
     RateMonotonic(analyzer::analyses::up_rate_monotonic::runner::Args),
 }
 
@@ -80,7 +86,22 @@ fn main() {
 fn main_w_exit_code(args: Args) -> Result<bool, Box<dyn std::error::Error>> {
     let taskset = parse_taskset(&args.taskset_file, args.taskset_file_ty)?;
 
-    let result = match args.analysis {
+    let analysis_args =
+        if args.analysis.is_some() && args.config_file.is_some() {
+            return Err(format!("Either use a configuration file or give analysis parameters as arguments, but not both (run with -h for help)").into());
+        } else if args.analysis.is_some() {
+            args.analysis.unwrap()
+        } else if args.config_file.is_some() {
+            let config_data = std::fs::read_to_string(args.config_file.unwrap())
+                .map_err(|err| format!("Config parse error: {err}"))?;
+
+            serde_json::from_str(&config_data)
+                .map_err(|err| format!("Config parse error: {err}"))?
+        } else {
+            return Err(format!("Use a configuration file or give analysis parameters as arguments (run with -h for help)").into());
+        };
+
+    let result = match analysis_args {
         Analyses::RateMonotonic(args) => up_rate_monotonic::runner::main(&taskset, args)?,
     };
     
