@@ -4,7 +4,10 @@ use crate::prelude::*;
 pub struct Args {
     /// Analysis to run
     /// 
-    /// classic: Liu & Layland 1973
+    /// classic:    Liu & Layland 1973
+    /// simple:     Liu & Layland 1973
+    ///             upper bound for any number of tasks
+    /// hyperbolic: Bini, Buttazzo and Buttazzo 2001
     #[arg(value_enum, value_name= "type", default_value="classic", verbatim_doc_comment)]
     typ: Type,
 }

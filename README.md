@@ -16,11 +16,9 @@
 
 ### Single Processor Analyses
 
-*References are available at the end of the page*
+*References are available in the individual sub-pages*
 
-- **Rate Monotonic**
-    - *Classic* - Liu & Layland (1973) [1]
-    - *Hyperbolic Bound* - Bini, Buttazzo and Buttazzo (2001) [2]
+- [**Rate Monotonic**](src/analyses/up_rate_monotonic/README.md)
 - **Earliest Deadline First** - Liu & Layland (1973) [1]
 - **Deadline Monotonic** - Leung & Whitehead (1982) [3]
 - **Response Time Analysis** - Joseph & Pandya (1986) [4]

@@ -1,4 +1,5 @@
 pub mod prelude {
+    pub use super::taskset_serde::prelude::*;
     pub use super::{
         Time,
         RTTask,
@@ -6,6 +7,8 @@ pub mod prelude {
         RTBandwidth
     };
 }
+
+pub mod taskset_serde;
 
 #[derive(Clone, Copy)]
 #[derive(Debug)]

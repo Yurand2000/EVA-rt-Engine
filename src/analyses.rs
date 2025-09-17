@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 pub mod prelude {
+    pub use super::up_rate_monotonic;
     pub use super::{
         Error,
         AnalysisUtils,
