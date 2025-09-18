@@ -18,7 +18,7 @@ pub fn is_schedulable_implicit(taskset: &[RTTask], num_processors: u64) -> Resul
 // on parallel and distributed systems, 20(4), pp.553-566.
 // Theorem 3
 // Section 3 Equation 3
-pub fn is_schedulable_constrained(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
+pub fn is_schedulable_constrained(taskset: &[RTTask], num_processors: i64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
     let d_tot = RTUtils::total_density(taskset);
@@ -29,7 +29,7 @@ pub fn is_schedulable_constrained(taskset: &[RTTask], num_processors: u64) -> Re
 
 // Theorem 6
 // Section 4 Equation 7
-pub fn is_schedulable_generic_work_conserving(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
+pub fn is_schedulable_generic_work_conserving(taskset: &[RTTask], num_processors: i64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
     Ok(taskset.iter().enumerate()
@@ -39,17 +39,17 @@ pub fn is_schedulable_generic_work_conserving(taskset: &[RTTask], num_processors
                 .filter(|(i, _)| *i != k)
                 .map(|(_, task_i)| {
                     let w_i = workload_upperbound((Time::zero(), task_k.deadline), task_i);
-                    Time::min(w_i, task_k.laxity() + Time { value_ns: 1 })
+                    Time::min(w_i, task_k.laxity() + Time::one())
                 })
                 .sum();
 
-            ub < num_processors * (task_k.laxity() + Time { value_ns: 1})
+            ub < num_processors * (task_k.laxity() + Time::one())
         }))
 }
 
 // Theorem 7
 // Section 4 Equation 9
-pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
+pub fn is_schedulable(taskset: &[RTTask], num_processors: i64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
     Ok(taskset.iter().enumerate()
@@ -59,15 +59,15 @@ pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> Result<bool, E
                 .filter(|(i, _)| *i != k)
                 .map(|(_, task_i)| {
                     let i_ik = interference_edf_upperbound(task_i, task_k);
-                    Time::min(i_ik, task_k.laxity() + Time { value_ns: 1 })
+                    Time::min(i_ik, task_k.laxity() + Time::one())
                 })
                 .sum();
 
-            ub < num_processors * (task_k.laxity() + Time { value_ns: 1})
+            ub < num_processors * (task_k.laxity() + Time::one())
         }))
 }
 
-pub fn is_schedulable_fixed_priority(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
+pub fn is_schedulable_fixed_priority(taskset: &[RTTask], num_processors: i64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
     Ok(taskset.iter().enumerate()
@@ -77,11 +77,11 @@ pub fn is_schedulable_fixed_priority(taskset: &[RTTask], num_processors: u64) ->
                 .filter(|(i, _)| *i < k)
                 .map(|(_, task_i)| {
                     let w_i = workload_upperbound((Time::zero(), task_k.deadline), task_i);
-                    Time::min(w_i, task_k.laxity() + Time { value_ns: 1 })
+                    Time::min(w_i, task_k.laxity() + Time::one())
                 })
                 .sum();
 
-            ub < num_processors * (task_k.laxity() + Time { value_ns: 1})
+            ub < num_processors * (task_k.laxity() + Time::one())
         }))
 }
 
@@ -91,7 +91,7 @@ fn workload_upperbound(interval: (Time, Time), task: &RTTask) -> Time {
 }
 
 // Section 4 Equation 5
-fn jobs_in_interval(interval: (Time, Time), task: &RTTask) -> u64 {
+fn jobs_in_interval(interval: (Time, Time), task: &RTTask) -> i64 {
     let length = interval.1 - interval.0;
 
     (length + task.laxity()) / task.period
@@ -117,7 +117,7 @@ fn interference_edf_upperbound(by_task: &RTTask, to_task: &RTTask) -> Time {
     Time::min(task_i.wcet, task_k.deadline - (task_k.deadline / task_i.period) * task_i.period)
 }
 
-fn slack_lb(taskset: &[RTTask], task_k: &RTTask, num_processors: u64) -> Time {
+fn slack_lb(taskset: &[RTTask], task_k: &RTTask, num_processors: i64) -> Time {
     let k = 0;
 
     let lb: Time = 
@@ -125,7 +125,7 @@ fn slack_lb(taskset: &[RTTask], task_k: &RTTask, num_processors: u64) -> Time {
         .filter(|(i, _)| *i != k)
         .map(|(_, task_i)| {
             let workload = workload_upperbound((Time::zero(), task_k.deadline), task_i);
-            Time::min(workload, task_k.laxity() + Time { value_ns: 1 })
+            Time::min(workload, task_k.laxity() + Time::one())
         })
         .sum();
 

@@ -14,7 +14,7 @@ pub mod taskset_serde;
 #[derive(Debug)]
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct Time {
-    pub value_ns: u64
+    value_ns_w_precision: i64
 }
 
 pub type RTBandwidth = f64;
@@ -33,36 +33,87 @@ pub struct RTUtils;
 // =============================================================================
 
 impl Time {
-    const MICRO_TO_NANO: u64 = 1000;
-    const MILLI_TO_NANO: u64 = 1000_000;
-    const SECS_TO_NANO: u64 = 1000_000_000;
+    pub const MICRO_TO_NANO: i64 = 1000;
+    pub const MILLI_TO_NANO: i64 = 1000_000;
+    pub const SECS_TO_NANO: i64 = 1000_000_000;
+    const PRECISION_BITS: i64 = 10;
+    pub const PRECISION: i64 = 2 << Self::PRECISION_BITS;
+    const PRECISION_MASK: i64 = Self::PRECISION - 1;
 
     pub fn zero() -> Self {
-        Self { value_ns: 0 }
+        Self { value_ns_w_precision: 0 }
     }
 
-    pub fn nanos(time_ns: u64) -> Self {
-        Self { value_ns: time_ns }
+    pub fn one() -> Self {
+        Self { value_ns_w_precision: Self::PRECISION }
     }
 
-    pub fn micros(time_us: u64) -> Self {
-        Self { value_ns: time_us * Self::MICRO_TO_NANO }
+    pub fn nanos_f64(time_ns: f64) -> Self {
+        Self { value_ns_w_precision: (time_ns * Self::PRECISION as f64) as i64 }
     }
 
-    pub fn millis(time_ms: u64) -> Self {
-        Self { value_ns: time_ms * Self::MILLI_TO_NANO }
+    pub fn nanos(time_ns: i64) -> Self {
+        Self { value_ns_w_precision: time_ns * Self::PRECISION }
     }
 
-    pub fn as_nanos(&self) -> u64 {
-        self.value_ns
+    pub fn micros(time_us: i64) -> Self {
+        Self { value_ns_w_precision: time_us * Self::MICRO_TO_NANO * Self::PRECISION }
     }
 
-    pub fn as_micros(&self) -> u64 {
-        self.value_ns / Self::MICRO_TO_NANO
+    pub fn millis(time_ms: i64) -> Self {
+        Self { value_ns_w_precision: time_ms * Self::MILLI_TO_NANO * Self::PRECISION }
     }
 
-    pub fn as_millis(&self) -> u64 {
-        self.value_ns / Self::MILLI_TO_NANO
+    pub fn raw(time_raw: i64) -> Self {
+        Self { value_ns_w_precision: time_raw }
+    }
+
+    pub fn as_nanos_f64(&self) -> f64 {
+        (self.value_ns_w_precision / Self::PRECISION) as f64
+    }
+
+    pub fn as_nanos(&self) -> i64 {
+        self.value_ns_w_precision / Self::PRECISION 
+    }
+
+    pub fn as_micros(&self) -> i64 {
+        self.value_ns_w_precision / (Self::MICRO_TO_NANO * Self::PRECISION)
+    }
+
+    pub fn as_millis(&self) -> i64 {
+        self.value_ns_w_precision / (Self::MILLI_TO_NANO * Self::PRECISION)
+    }
+
+    pub fn as_raw(&self) -> i64 {
+        self.value_ns_w_precision
+    }
+
+    pub fn div_floor_i64(self, rhs: i64) -> Self {
+        Time::raw(i64::div_floor(self.value_ns_w_precision, rhs))
+    }
+
+    pub fn div_ceil_i64(self, rhs: i64) -> Self {
+        Time::raw(i64::div_ceil(self.value_ns_w_precision, rhs))
+    }
+
+    pub fn div_floor_time(self, rhs: Self) -> i64 {
+        i64::div_floor(self.value_ns_w_precision, rhs.value_ns_w_precision)
+    }
+
+    pub fn div_ceil_time(self, rhs: Self) -> i64 {
+        i64::div_ceil(self.value_ns_w_precision, rhs.value_ns_w_precision)
+    }
+
+    pub fn floor(self) -> Self {
+        Self { value_ns_w_precision: self.value_ns_w_precision & (!Self::PRECISION_MASK) }
+    }
+
+    pub fn ceil(self) -> Self {
+        if self.value_ns_w_precision & Self::PRECISION_MASK > 0 {
+            self + Time::one()
+        } else {
+            self
+        }
     }
 }
 
@@ -70,7 +121,7 @@ impl std::ops::Add for Time {
     type Output = Time;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Self::Output { value_ns: (self.value_ns + rhs.value_ns) }
+        Self::Output { value_ns_w_precision: (self.value_ns_w_precision + rhs.value_ns_w_precision) }
     }
 }
 
@@ -78,19 +129,19 @@ impl std::ops::Sub for Time {
     type Output = Time;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        Self::Output { value_ns: (self.value_ns - rhs.value_ns) }
+        Self::Output { value_ns_w_precision: (self.value_ns_w_precision - rhs.value_ns_w_precision) }
     }
 }
 
-impl std::ops::Mul<u64> for Time {
+impl std::ops::Mul<i64> for Time {
     type Output = Time;
 
-    fn mul(self, rhs: u64) -> Self::Output {
-        Self::Output { value_ns: (self.value_ns * rhs) }
+    fn mul(self, rhs: i64) -> Self::Output {
+        Self::Output { value_ns_w_precision: (self.value_ns_w_precision * rhs) }
     }
 }
 
-impl std::ops::Mul<Time> for u64 {
+impl std::ops::Mul<Time> for i64 {
     type Output = Time;
 
     fn mul(self, rhs: Time) -> Self::Output {
@@ -99,18 +150,18 @@ impl std::ops::Mul<Time> for u64 {
 }
 
 impl std::ops::Div for Time {
-    type Output = u64;
+    type Output = i64;
 
     fn div(self, rhs: Self) -> Self::Output {
-        self.value_ns / rhs.value_ns
+        self.value_ns_w_precision / rhs.value_ns_w_precision
     }
 }
 
-impl std::ops::Div<u64> for Time {
+impl std::ops::Div<i64> for Time {
     type Output = Time;
 
-    fn div(self, rhs: u64) -> Self::Output {
-        Time { value_ns: self.value_ns / rhs }
+    fn div(self, rhs: i64) -> Self::Output {
+        Time { value_ns_w_precision: self.value_ns_w_precision / rhs }
     }
 }
 
@@ -124,7 +175,7 @@ impl serde::Serialize for Time {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer {
-        format!("{} ns", self.value_ns).serialize(serializer)
+        format!("{} ns", self.value_ns_w_precision).serialize(serializer)
     }
 }
 
@@ -136,12 +187,12 @@ impl<'de> serde::Deserialize<'de> for Time {
         
         let pieces: Vec<_> = time_string.trim().split_whitespace().collect();
         if pieces.len() == 1 {
-            let time: u64 = pieces[0].parse()
+            let time: i64 = pieces[0].parse()
                 .map_err(|err| serde::de::Error::custom(format!("Invalid time: {err}")))?;
 
-            Ok(Time { value_ns: time })
+            Ok(Time { value_ns_w_precision: time })
         } else if pieces.len() == 2 {
-            let time: u64 = pieces[0].parse()
+            let time: i64 = pieces[0].parse()
                 .map_err(|err| serde::de::Error::custom(format!("Invalid time: {err}")))?;
             let unit = match pieces[1] {
                 "s" => Time::SECS_TO_NANO,
@@ -151,7 +202,7 @@ impl<'de> serde::Deserialize<'de> for Time {
                 u => { return Err(serde::de::Error::custom(format!("Unknown time unit: {u}"))); }
             };
 
-            Ok(Time { value_ns: time * unit })
+            Ok(Time { value_ns_w_precision: time * unit * Self::PRECISION })
         } else {
             return Err(serde::de::Error::custom("Parsing error, unknown format"));
         }
@@ -161,18 +212,18 @@ impl<'de> serde::Deserialize<'de> for Time {
 impl RTTask {
     pub fn new_ns(wcet: u64, deadline: u64, period: u64) -> Self {
         Self {
-            wcet: Time::nanos(wcet),
-            deadline: Time::nanos(deadline),
-            period: Time::nanos(period),
+            wcet: Time::nanos(wcet as i64),
+            deadline: Time::nanos(deadline as i64),
+            period: Time::nanos(period as i64),
         }
     }
 
     pub fn get_utilization(&self) -> RTBandwidth {
-        (self.wcet.value_ns as RTBandwidth) / (self.period.value_ns as RTBandwidth)
+        (self.wcet.value_ns_w_precision as RTBandwidth) / (self.period.value_ns_w_precision as RTBandwidth)
     }
 
     pub fn get_density(&self) -> RTBandwidth {
-        (self.wcet.value_ns as RTBandwidth) / (self.deadline.value_ns as RTBandwidth)
+        (self.wcet.value_ns_w_precision as RTBandwidth) / (self.deadline.value_ns_w_precision as RTBandwidth)
     }
 
     pub fn laxity(&self) -> Time {
@@ -240,11 +291,11 @@ impl RTUtils {
     }
 
     pub fn hyperperiod(taskset: &[RTTask]) -> Time {
-        let hyperperiod_ns =
+        let hyperperiod =
             taskset.iter()
-            .map(|task| task.period.value_ns)
-            .fold(1, |lcm, period| num::integer::lcm(lcm, period));
+            .map(|task| task.period.value_ns_w_precision)
+            .fold(Time::one().value_ns_w_precision, |lcm, period| num::integer::lcm(lcm, period));
 
-        Time { value_ns: hyperperiod_ns }
+        Time { value_ns_w_precision: hyperperiod }
     }
 }

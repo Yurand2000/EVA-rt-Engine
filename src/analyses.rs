@@ -18,6 +18,7 @@ pub mod response_time_analysis;
 // Multi Processor analyses
 pub mod smp_edf;
 pub mod smp_dm;
+pub mod multiprocessor_resource_model;
 
 #[derive(Clone)]
 #[derive(Debug)]

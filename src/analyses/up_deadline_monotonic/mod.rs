@@ -22,8 +22,8 @@ pub fn is_schedulable(taskset: &[RTTask]) -> Result<bool, Error> {
 
     Ok(taskset.iter().enumerate()
         .all(|(i, task)| {
-            let interference = interference(&taskset[0..=i]) as u64;
-            task.wcet.value_ns + interference <= task.deadline.value_ns
+            let interference = interference(&taskset[0..=i]) as i64;
+            task.wcet.as_nanos() + interference <= task.deadline.as_nanos()
         }))
 }
 
@@ -37,8 +37,8 @@ fn interference(tasksubset: &[RTTask]) -> f64 {
     tasksubset.iter()
         .take(tasksubset.len() - 1)
         .map(|task| {
-            f64::ceil(task.deadline.value_ns as f64 / last_task.period.value_ns as f64)
-                * last_task.wcet.value_ns as f64
+            f64::ceil(task.deadline.as_nanos() as f64 / last_task.period.as_nanos() as f64)
+                * last_task.wcet.as_nanos() as f64
         })
         .sum()
 }

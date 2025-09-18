@@ -31,11 +31,11 @@ pub fn is_schedulable(taskset: &[RTTask], buffered_inputs: bool) -> Result<bool,
 
 // Function 2
 // Max number of activation in the given time interval
-fn inputs(interval: (Time, Time), task: &RTTask) -> u64 {
+fn inputs(interval: (Time, Time), task: &RTTask) -> i64 {
     let (start, end) = interval;
 
-    f64::ceil( (end.value_ns as f64) / (task.period.value_ns as f64) ) as u64 - 
-    f64::ceil( (start.value_ns as f64) / (task.period.value_ns as f64) ) as u64
+    f64::ceil( (end.as_nanos() as f64) / (task.period.as_nanos() as f64) ) as i64 - 
+    f64::ceil( (start.as_nanos() as f64) / (task.period.as_nanos() as f64) ) as i64
 }
 
 // Function 3
@@ -44,7 +44,7 @@ fn comp(interval: (Time, Time), tasksubset: &[RTTask]) -> Time {
     let total_computation_time =
         tasksubset.iter()
         .take(tasksubset.len() - 1)
-        .map(|task| inputs(interval, task) * task.wcet.value_ns)
+        .map(|task| inputs(interval, task) * task.wcet.as_nanos())
         .sum();
 
     Time::nanos(total_computation_time)
@@ -57,7 +57,7 @@ fn avg_processing_load_is_met(tasksubset: &[RTTask]) -> bool {
     let avg_load: Time = 
         tasksubset.iter()
         .take(tasksubset.len() - 1)
-        .map(|task| Time { value_ns: hyperperiod.value_ns / task.period.value_ns * task.wcet.value_ns })
+        .map(|task| hyperperiod / task.period * task.wcet )
         .sum();
 
     avg_load < hyperperiod
