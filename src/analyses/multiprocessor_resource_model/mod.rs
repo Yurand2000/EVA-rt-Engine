@@ -1,4 +1,4 @@
-use crate::{analyses::response_time_analysis, prelude::*};
+use crate::prelude::*;
 
 #[derive(Clone)]
 #[derive(Debug)]
@@ -22,39 +22,39 @@ impl MPRModel {
     pub fn utilization(&self) -> f64 {
         self.resource.as_raw() as f64 / self.period.as_raw() as f64
     }
+}
 
-    // Equation 1 [1]
-    pub fn supply_bound_function(&self, time: Time) -> Time {
-        #[inline(always)]
-        fn k(model: &MPRModel, time: Time) -> i64 {
-            Time::div_floor_time(
-                time - model.period + Time::div_ceil_i64(model.resource, model.concurrency),
-                model.period
-            )
-        }
+// Equation 1 [1]
+pub fn supply_bound_function(model: &MPRModel, time: Time) -> Time {
+    #[inline(always)]
+    fn k(model: &MPRModel, time: Time) -> i64 {
+        Time::div_floor_time(
+            time - model.period + Time::div_ceil_i64(model.resource, model.concurrency),
+            model.period
+        )
+    }
 
-        #[allow(non_snake_case)]
-        #[inline(always)]
-        fn I(model: &MPRModel, time: Time) -> Time {
-            time - 2 * model.period + Time::div_ceil_i64(model.resource, model.concurrency)
-        }
+    #[allow(non_snake_case)]
+    #[inline(always)]
+    fn I(model: &MPRModel, time: Time) -> Time {
+        time - 2 * model.period + Time::div_ceil_i64(model.resource, model.concurrency)
+    }
 
-        // sbf conditions
-        if time >= self.period - Time::div_ceil_i64(self.resource, self.concurrency) {
-            k(self, time) * self.resource + Time::max(
-                Time::zero(),
-                (I(self, time) - k(self, time) * self.period) * self.concurrency + self.resource
-            )
-        } else {
-            Time::zero()
-        }
+    // sbf conditions
+    if time >= model.period - Time::div_ceil_i64(model.resource, model.concurrency) {
+        k(model, time) * model.resource + Time::max(
+            Time::zero(),
+            (I(model, time) - k(model, time) * model.period) * model.concurrency + model.resource
+        )
+    } else {
+        Time::zero()
     }
 }
 
-
-// global EDF for MPR ----------------------------------------------------------
 // Equation 2 [1]
-pub fn linear_supply_bound_function(interval: Time, period: Time, resource: Time, concurrency: i64) -> Time {
+pub fn linear_supply_bound_function(model: &MPRModel, interval: Time) -> Time {
+    let (resource, period, concurrency) = (model.resource, model.period, model.concurrency);
+    
     // integer arithmetics formula
     Time::raw128(
         resource.as_raw_128() * (interval - 2 * (period - resource / concurrency)).as_raw_128() / period.as_raw_128()
@@ -68,6 +68,9 @@ pub fn linear_supply_bound_function(interval: Time, period: Time, resource: Time
     // )
 }
 
+// Extracted Theta from Equation 2 [1]
+// Note that this only works for positive values of the linear supply bound.
+// There is only one positive solution for a positive bound, but two solutions or zero for a negative one.
 pub fn resource_from_linear_supply_bound(lsbf: Time, interval: Time, period: Time, concurrency: i64) -> Time {
     // integer arithmetics formula
     let (lsbf, interval, period, cpus) =
@@ -87,6 +90,8 @@ pub fn resource_from_linear_supply_bound(lsbf: Time, interval: Time, period: Tim
     //     cpus * (negb + f64::sqrt(negb*negb + 8.0 * period * lsbf / cpus)) / 4.0
     // )
 }
+
+// global EDF for MPR ----------------------------------------------------------
 
 // Equation 3 [1]
 fn workload_upperbound(task: &RTTask, time: Time) -> Time {
@@ -215,8 +220,9 @@ fn num_processors_upper_bound(taskset: &[RTTask]) -> i64 {
 // set of server tasks can be scheduled with uniprocessor algorithms, as they
 // are meant to be pinned to invididual CPUs.
 
-impl Into<Vec<RTTask>> for MPRModel {
-    fn into(self) -> Vec<RTTask> {
+impl MPRModel {
+    // Section 5.2, Definition 1 [1]
+    pub fn to_periodic_tasks(&self) -> Vec<RTTask> {
         #[inline(always)]
         fn psi(model: &MPRModel) -> Time {
             model.resource - model.concurrency * Time::div_floor_i64(model.resource, model.concurrency)
@@ -244,10 +250,8 @@ impl Into<Vec<RTTask>> for MPRModel {
             })
             .collect()
     }
-}
 
-impl Into<(RTTask, i64)> for MPRModel {
-    fn into(self) -> (RTTask, i64) {
+    pub fn to_periodic_tasks_simple(&self) -> (RTTask, i64) {
         let task =
             RTTask {
                 wcet: Time::div_floor_i64(self.resource, self.concurrency) + Time::one(),
@@ -271,7 +275,7 @@ fn test_lsbf() {
             continue;
         }
 
-        let lsbf = linear_supply_bound_function(interval, period, resource, concurrency);
+        let lsbf = linear_supply_bound_function(&MPRModel { resource, period, concurrency }, interval);
         // skip negative supply values
         if lsbf < Time::zero() {
             continue;
