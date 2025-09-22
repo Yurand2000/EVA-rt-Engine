@@ -16,8 +16,8 @@
 
 ---
 
-- **Joseph & Pandya** (1986) [^1]
+- **Shin, Easwaran, Lee** (2008) [^1]
 
 ### 📚 References
 
-[^1]: M. Joseph and P. Pandya, “Finding Response Times in a Real-Time System,” Comput J, vol. 29, no. 5, pp. 390–395, 1986, doi: 10.1093/comjnl/29.5.390.
+[^1]: I. Shin, A. Easwaran, and I. Lee, “Hierarchical Scheduling Framework for Virtual Clustering of Multiprocessors,” in 2008 Euromicro Conference on Real-Time Systems, July 2008, pp. 181–190. doi: 10.1109/ECRTS.2008.28.

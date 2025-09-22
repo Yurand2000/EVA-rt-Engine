@@ -37,7 +37,7 @@ impl Time {
     pub const MILLI_TO_NANO: i64 = 1000_000;
     pub const SECS_TO_NANO: i64 = 1000_000_000;
     const PRECISION_BITS: i64 = 10;
-    pub const PRECISION: i64 = 2 << Self::PRECISION_BITS;
+    pub const PRECISION: i64 = 1 << Self::PRECISION_BITS;
     const PRECISION_MASK: i64 = Self::PRECISION - 1;
 
     pub fn zero() -> Self {
@@ -68,24 +68,32 @@ impl Time {
         Self { value_ns_w_precision: time_raw }
     }
 
-    pub fn as_nanos_f64(&self) -> f64 {
-        (self.value_ns_w_precision / Self::PRECISION) as f64
+    pub fn raw128(time_raw: i128) -> Self {
+        Self { value_ns_w_precision: time_raw as i64 }
+    }
+
+    pub fn as_nanos_f64(&self) -> f64 {        
+        self.value_ns_w_precision as f64 / Self::PRECISION as f64 
     }
 
     pub fn as_nanos(&self) -> i64 {
-        self.value_ns_w_precision / Self::PRECISION 
+        rounded_div::i64(self.value_ns_w_precision, Self::PRECISION)        
     }
 
     pub fn as_micros(&self) -> i64 {
-        self.value_ns_w_precision / (Self::MICRO_TO_NANO * Self::PRECISION)
+        rounded_div::i64(self.value_ns_w_precision, Self::MICRO_TO_NANO * Self::PRECISION)
     }
 
     pub fn as_millis(&self) -> i64 {
-        self.value_ns_w_precision / (Self::MILLI_TO_NANO * Self::PRECISION)
+        rounded_div::i64(self.value_ns_w_precision, Self::MILLI_TO_NANO * Self::PRECISION)
     }
 
     pub fn as_raw(&self) -> i64 {
         self.value_ns_w_precision
+    }
+
+    pub fn as_raw_128(&self) -> i128 {
+        self.value_ns_w_precision as i128
     }
 
     pub fn div_floor_i64(self, rhs: i64) -> Self {
@@ -109,11 +117,24 @@ impl Time {
     }
 
     pub fn ceil(self) -> Self {
-        if self.value_ns_w_precision & Self::PRECISION_MASK > 0 {
-            self + Time::one()
+        if self.precision_bits() > 0 {
+            self.floor() + Time::one()
         } else {
-            self
+            self.floor()
         }
+    }
+
+    pub fn round(self) -> Self {
+        if 2 * self.precision_bits() >= Self::PRECISION {
+            self.floor() + Time::one()
+        } else {
+            self.floor()
+        }
+    }
+
+    #[inline(always)]
+    fn precision_bits(&self) -> i64 {
+        self.value_ns_w_precision & Self::PRECISION_MASK
     }
 }
 

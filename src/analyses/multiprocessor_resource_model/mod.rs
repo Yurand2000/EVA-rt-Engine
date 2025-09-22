@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{analyses::response_time_analysis, prelude::*};
 
 #[derive(Clone)]
 #[derive(Debug)]
@@ -55,24 +55,37 @@ impl MPRModel {
 // global EDF for MPR ----------------------------------------------------------
 // Equation 2 [1]
 pub fn linear_supply_bound_function(interval: Time, period: Time, resource: Time, concurrency: i64) -> Time {
-    resource.as_nanos() * (interval - 2 * (period - resource / concurrency)) / period.as_nanos()
+    // integer arithmetics formula
+    Time::raw128(
+        resource.as_raw_128() * (interval - 2 * (period - resource / concurrency)).as_raw_128() / period.as_raw_128()
+    )
 
-    // Time::nanos_f64(resource.as_nanos_f64() / period.as_nanos_f64() * (interval.as_nanos_f64() - 2.0 * (period.as_nanos_f64() - resource.as_nanos_f64() / concurrency as f64))).floor()
+    // floating-point arithmetics formula
+    // let (resource, interval, period, concurrency) =
+    //     (resource.as_nanos_f64(), interval.as_nanos_f64(), period.as_nanos_f64(), concurrency as f64);
+    // Time::nanos_f64(
+    //     resource * (interval - 2.0 * (period - resource / concurrency)) / period
+    // )
 }
 
-pub fn linear_supply_bound_function_inverse(lsbf: Time, interval: Time, period: Time, concurrency: i64) -> Time {
-    let a = 2.0 / concurrency as f64;
-    let b = interval.as_nanos_f64() - 2.0 * period.as_nanos_f64();
-    let c = - period.as_nanos_f64() * lsbf.as_nanos_f64();
+pub fn resource_from_linear_supply_bound(lsbf: Time, interval: Time, period: Time, concurrency: i64) -> Time {
+    // integer arithmetics formula
+    let (lsbf, interval, period, cpus) =
+        (lsbf.as_raw_128(), interval.as_raw_128(), period.as_raw_128(), concurrency as i128);
+    let negb = 2 * period - interval;
 
-    let negb = -b;
-    let bsqr = b * b;
+    Time::raw128(
+        cpus * (negb + num::integer::sqrt(negb*negb + 8 * period * lsbf / cpus)) / 4
+    )
 
-    let neg4ac = -4.0 * a * c;
+    // floating-point arithmetics formula
+    // let (lsbf, interval, period, cpus) =
+    //     (lsbf.as_nanos_f64(), interval.as_nanos_f64(), period.as_nanos_f64(), concurrency as f64);
+    // let negb = 2.0 * period - interval;
 
-    let pos2a = 2.0 * a;
-
-    Time::nanos_f64((negb - f64::sqrt(bsqr + neg4ac)) / pos2a)
+    // Time::nanos_f64(
+    //     cpus * (negb + f64::sqrt(negb*negb + 8.0 * period * lsbf / cpus)) / 4.0
+    // )
 }
 
 // Equation 3 [1]
@@ -249,20 +262,24 @@ impl Into<(RTTask, i64)> for MPRModel {
 // Tests -----------------------------------------------------------------------
 #[test]
 fn test_lsbf() {
-    let resource = Time::millis(50);
-    let period = Time::millis(300);
-    let concurrency = 3;
-    let interval = Time::millis(10);
+    for resource in    (10 .. 1000).step_by(10).map(|ms| Time::millis(ms)) {
+    for period in      (10 .. 1000).step_by(10).map(|ms| Time::millis(ms)) {
+    for interval in    (10 .. 1000).step_by(10).map(|ms| Time::millis(ms)) {
+    for concurrency in   1 .. 10 {
+        // skip unfeasible models
+        if resource >= concurrency * period {
+            continue;
+        }
 
-    // let resource = Time::raw(100);
-    // let period = Time::raw(100);
-    // let concurrency = 1;
-    // let interval = Time::raw(100);
+        let lsbf = linear_supply_bound_function(interval, period, resource, concurrency);
+        // skip negative supply values
+        if lsbf < Time::zero() {
+            continue;
+        }
 
-    let lsbf = linear_supply_bound_function(interval, period, resource, concurrency);
-    let inverse = linear_supply_bound_function_inverse(lsbf, interval, period, concurrency);
-
-    assert_eq!(resource.as_nanos(), inverse.as_nanos());
+        let inverse = resource_from_linear_supply_bound(lsbf, interval, period, concurrency);
+        assert_eq!(resource.as_nanos(), inverse.as_nanos());
+    }}}}
 }
 
 // References ------------------------------------------------------------------
