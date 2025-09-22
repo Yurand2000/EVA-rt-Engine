@@ -69,9 +69,12 @@ pub fn linear_supply_bound_function(model: &MPRModel, interval: Time) -> Time {
 }
 
 // Extracted Theta from Equation 2 [1]
-// Note that this only works for positive values of the linear supply bound.
-// There is only one positive solution for a positive bound, but two solutions or zero for a negative one.
 pub fn resource_from_linear_supply_bound(lsbf: Time, interval: Time, period: Time, concurrency: i64) -> Time {
+    // Note that this only works for positive values of the linear supply bound.
+    // There is only one positive solution for a positive bound, but two
+    // solutions or zero for a negative one.
+    debug_assert!(lsbf >= Time::zero());
+
     // integer arithmetics formula
     let (lsbf, interval, period, cpus) =
         (lsbf.as_raw_128(), interval.as_raw_128(), period.as_raw_128(), concurrency as i128);
@@ -92,6 +95,44 @@ pub fn resource_from_linear_supply_bound(lsbf: Time, interval: Time, period: Tim
 }
 
 // global EDF for MPR ----------------------------------------------------------
+
+// Section 5.1 [1]
+pub fn generate_interface_global_edf(taskset: &[RTTask], period: Time) -> MPRModel {
+    let v : Vec<_> = (
+        num_processors_lower_bound(taskset) ..=
+        num_processors_upper_bound(taskset)
+    ).collect();
+
+    let num_processors = 
+        v.binary_search_by_key(|i: &i64| -> std::cmp::Ordering {
+            todo!()
+        })
+        .unwrap() as i64; // the upperbound number of processors guarantees schedulability
+
+    todo!()
+}
+
+fn num_processors_lower_bound(taskset: &[RTTask]) -> i64 {
+    f64::ceil(RTUtils::total_utilization(taskset)) as i64
+}
+
+// Section 5.1, Lemma 4 [1]
+fn num_processors_upper_bound(taskset: &[RTTask]) -> i64 {
+    debug_assert!(!taskset.is_empty());
+
+    let n = taskset.len() as i64;
+
+    let total_work: Time = taskset.iter()
+        .map(|task| task.wcet)
+        .sum();
+
+    let den = taskset.iter()
+        .map(|task| task.deadline - task.wcet)
+        .min()
+        .unwrap();
+
+    total_work / den + n
+}
 
 // Equation 3 [1]
 fn workload_upperbound(task: &RTTask, time: Time) -> Time {
@@ -174,44 +215,6 @@ fn demand(taskset: &[RTTask], k: usize, release: Time, num_processors: i64) -> T
         .sum();
    
     sum0 + sum1 + num_processors * taskset[k].wcet
-}
-
-// -----------------------------------------------------------------------------
-
-pub fn generate_interface_global_edf(taskset: &[RTTask], period: Time) -> MPRModel {
-    let v : Vec<_> = (
-        num_processors_lower_bound(taskset) ..=
-        num_processors_upper_bound(taskset)
-    ).collect();
-
-    let num_processors = 
-        v.binary_search_by(|i: &i64| -> std::cmp::Ordering {
-            todo!()
-        })
-        .unwrap() as i64; // given the upperbound, this cannot fail
-
-    todo!()
-}
-
-fn num_processors_lower_bound(taskset: &[RTTask]) -> i64 {
-    f64::ceil(RTUtils::total_utilization(taskset)) as i64
-}
-
-fn num_processors_upper_bound(taskset: &[RTTask]) -> i64 {
-    assert!(!taskset.is_empty());
-
-    let n = taskset.len() as i64;
-
-    let total_work: Time = taskset.iter()
-        .map(|task| task.wcet)
-        .sum();
-
-    let den = taskset.iter()
-        .map(|task| task.deadline - task.wcet)
-        .min()
-        .unwrap();
-
-    total_work / den + n
 }
 
 // -----------------------------------------------------------------------------
