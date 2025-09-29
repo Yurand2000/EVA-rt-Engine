@@ -1,4 +1,4 @@
-use analyzer::prelude::*;
+use eva_engine::prelude::*;
 
 const DEFAULT_AFTER_HELP: &str = "Refer to README.md files for further documentation";
 
@@ -38,7 +38,7 @@ enum Analyses {
     /// - Implicit deadlines.
     #[command(name = "rate-monotonic", after_help=DEFAULT_AFTER_HELP, verbatim_doc_comment)]
     #[serde(rename = "rate-monotonic")]
-    RateMonotonic(analyzer::analyses::up_rate_monotonic::runner::Args),
+    RateMonotonic(eva_engine::analyses::up_rate_monotonic::runner::Args),
 }
 
 fn main() {

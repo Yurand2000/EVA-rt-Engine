@@ -103,12 +103,6 @@ pub fn generate_interface_global_edf(taskset: &[RTTask], period: Time) -> MPRMod
         num_processors_upper_bound(taskset)
     ).collect();
 
-    let num_processors = 
-        v.binary_search_by_key(|i: &i64| -> std::cmp::Ordering {
-            todo!()
-        })
-        .unwrap() as i64; // the upperbound number of processors guarantees schedulability
-
     todo!()
 }
 
