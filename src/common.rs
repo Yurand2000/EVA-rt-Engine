@@ -136,6 +136,10 @@ impl Time {
     fn precision_bits(&self) -> i64 {
         self.value_ns_w_precision & Self::PRECISION_MASK
     }
+
+    pub fn positive_or_zero(self) -> Self {
+        Time::max(self, Time::zero())
+    }
 }
 
 impl std::ops::Add for Time {

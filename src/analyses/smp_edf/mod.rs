@@ -1,10 +1,9 @@
 use crate::prelude::*;
 
-
 /// Goossens, J., Funk, S. and Baruah, S., 2003. Priority-driven scheduling of
 /// periodic task systems on multiprocessors. Real-time systems, 25(2),
 /// pp.187-205. *Theorem 5*
-/// 
+///
 /// **Notes:**
 /// - Periodic tasks.
 /// - Implicit deadlines.
@@ -21,7 +20,7 @@ pub fn gfb_test_periodic(taskset: &[RTTask], num_processors: u64) -> Result<bool
 /// EDF on multiprocessor platforms,” in 17th Euromicro Conference on Real-Time
 /// Systems (ECRTS’05), July 2005, pp. 209–218. doi: 10.1109/ECRTS.2005.18.
 /// *Theorem 4, Equation 5*
-/// 
+///
 /// **Notes:**
 /// - Sporadic tasks.
 /// - Constrained deadlines.
@@ -38,7 +37,7 @@ pub fn gfb_test_sporadic(taskset: &[RTTask], num_processors: u64) -> Result<bool
 /// EDF on multiprocessor platforms,” in 17th Euromicro Conference on Real-Time
 /// Systems (ECRTS’05), July 2005, pp. 209–218. doi: 10.1109/ECRTS.2005.18.
 /// *Theorem 5, Equation 6*
-/// 
+///
 /// **Notes:**
 /// - Sporadic tasks.
 /// - Constrained deadlines.
@@ -62,6 +61,51 @@ pub fn bak_test(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> 
                 .sum::<f64>()
             <=
             num_processors as f64 * (1.0 - task_k.get_density()) + task_k.get_density()
+        }))
+}
+
+/// M. Bertogna, M. Cirinei, and G. Lipari, “Improved schedulability analysis of
+/// EDF on multiprocessor platforms,” in 17th Euromicro Conference on Real-Time
+/// Systems (ECRTS’05), July 2005, pp. 209–218. doi: 10.1109/ECRTS.2005.18.
+/// *Theorem 7, Equation 8*
+///
+/// **Notes:**
+/// - Sporadic tasks.
+/// - Constrained deadlines.
+pub fn bcl_edf(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
+    AnalysisUtils::assert_constrained_deadlines(taskset)?;
+
+    #[inline(always)]
+    fn num_jobs(task_i: &RTTask, task_k: &RTTask) -> i64 {
+        (task_k.deadline - task_i.deadline).div_floor_time(task_i.period) + 1
+    }
+
+    #[inline(always)]
+    fn beta(task_i: &RTTask, task_k: &RTTask) -> RTBandwidth {
+        (num_jobs(task_i, task_k) * task_i.wcet + Time::min(task_i.wcet, (task_k.deadline - num_jobs(task_i, task_k) * task_i.period).positive_or_zero())).as_nanos_f64() / task_k.deadline.as_nanos_f64()
+    }
+
+    Ok(taskset.iter().enumerate()
+        .all(|(k, task_k)| {
+            let mut beta_in_range = false;
+
+            let sum = taskset.iter().enumerate()
+                .filter(|(i, _)| *i != k)
+                .map(|(_, task_i)| {
+                    let beta = beta(task_i, task_k);
+
+                    if beta > 0.0 && beta <= 1.0 - task_k.get_density() {
+                        beta_in_range = true;
+                    }
+
+                    beta
+                })
+                .map(|beta_i| f64::min(beta_i, 1.0 - task_k.get_density()))
+                .sum::<f64>();
+
+            let cmp = num_processors as f64 * (1.0 - task_k.get_density());
+
+            sum < cmp || (sum == cmp && beta_in_range)
         }))
 }
 
@@ -158,7 +202,7 @@ fn interference_edf_upperbound(by_task: &RTTask, to_task: &RTTask) -> Time {
 fn slack_lb(taskset: &[RTTask], task_k: &RTTask, num_processors: i64) -> Time {
     let k = 0;
 
-    let lb: Time = 
+    let lb: Time =
         taskset.iter().enumerate()
         .filter(|(i, _)| *i != k)
         .map(|(_, task_i)| {
