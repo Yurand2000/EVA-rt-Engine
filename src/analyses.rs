@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
 pub mod prelude {
-    pub use super::up_rate_monotonic;
     pub use super::{
         Error,
         AnalysisUtils,
@@ -9,15 +8,15 @@ pub mod prelude {
 }
 
 // Single Processor analyses
-pub mod up_rate_monotonic;
+pub mod up_fixed_priority;
 pub mod up_earliest_deadline_first;
-pub mod up_deadline_monotonic;
 
 pub mod response_time_analysis;
 
 // Multi Processor analyses
+pub mod smp_generic;
 pub mod smp_edf;
-pub mod smp_dm;
+pub mod smp_fp;
 pub mod multiprocessor_resource_model;
 
 #[derive(Clone)]

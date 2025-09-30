@@ -14,7 +14,10 @@
     - *Constrained deadlines.*
 - **BAK Test** - Baker (2003) [^4]
     - *Constrained deadlines.*
-- **Constrained Deadlines** - Bertogna, Cirinei and Lipari (2009) [^2]
+- **BCL-EDF** - Bertogna, Cirinei and Lipari (2005) [^3]
+    - *Constrained deadlines.*
+- **IBCL-EDF** - Bertogna, Cirinei and Lipari (2009) [^2]
+    - *Constrained deadlines.*
 
 ### 📚 References
 
