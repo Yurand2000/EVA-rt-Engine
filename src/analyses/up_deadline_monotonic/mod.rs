@@ -4,11 +4,12 @@ use crate::prelude::*;
 // scheduling of periodic, real-time tasks. Performance evaluation, 2(4),
 // pp.237-250.
 pub fn is_schedulable_pessimistic(taskset: &[RTTask]) -> Result<bool, Error> {
-    assert_preconditions(taskset)?;
+    AnalysisUtils::assert_constrained_deadlines(taskset)?;
+    AnalysisUtils::assert_ordered_by_deadline(taskset)?;
 
     let utilization: f64 =
         taskset.iter()
-        .map(RTTask::get_density)
+        .map(RTTask::density)
         .sum();
 
     let utilization_bound =
@@ -18,34 +19,25 @@ pub fn is_schedulable_pessimistic(taskset: &[RTTask]) -> Result<bool, Error> {
 }
 
 pub fn is_schedulable(taskset: &[RTTask]) -> Result<bool, Error> {
-    assert_preconditions(taskset)?;
-
-    Ok(taskset.iter().enumerate()
-        .all(|(i, task)| {
-            let interference = interference(&taskset[0..=i]) as i64;
-            task.wcet.as_nanos() + interference <= task.deadline.as_nanos()
-        }))
-}
-
-fn interference(tasksubset: &[RTTask]) -> f64 {
-    if tasksubset.len() == 0 {
-        return 0f64;
-    }
-
-    let last_task = tasksubset.last().unwrap();
-
-    tasksubset.iter()
-        .take(tasksubset.len() - 1)
-        .map(|task| {
-            f64::ceil(task.deadline.as_nanos() as f64 / last_task.period.as_nanos() as f64)
-                * last_task.wcet.as_nanos() as f64
-        })
-        .sum()
-}
-
-fn assert_preconditions(taskset: &[RTTask]) -> Result<(), Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_ordered_by_deadline(taskset)?;
 
-    Ok(())
+    #[inline(always)]
+    fn interference(tasksubset: &[RTTask]) -> Time {
+        if tasksubset.len() == 0 {
+            return Time::zero();
+        }
+
+        let last_task = tasksubset.last().unwrap();
+
+        tasksubset.iter()
+            .take(tasksubset.len() - 1)
+            .map(|task| (task.deadline / last_task.period).ceil() * last_task.wcet )
+            .sum()
+    }
+
+    Ok(taskset.iter().enumerate()
+        .all(|(i, task)| {
+            task.wcet + interference(&taskset[0..=i]) <= task.deadline
+        }))
 }

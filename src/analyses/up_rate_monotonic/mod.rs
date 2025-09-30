@@ -32,11 +32,11 @@ pub fn is_schedulable_simple(taskset: &[RTTask]) -> Result<bool, Error> {
 // Real-Time Systems (pp. 59-66). IEEE.
 pub fn is_schedulable_hyperbolic(taskset: &[RTTask]) -> Result<bool, Error> {
     assert_preconditions(taskset)?;
-    
+
     // Theorem 1
     let bound: f64 =
         taskset.iter()
-        .map(|task| task.get_utilization() + 1f64)
+        .map(|task| task.utilization() + 1f64)
         .product();
 
     Ok(bound <= 2f64)

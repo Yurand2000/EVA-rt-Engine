@@ -3,7 +3,7 @@ use crate::prelude::*;
 #[derive(Clone)]
 #[derive(Debug)]
 pub enum Error {
-    
+
 }
 
 pub struct MPRModel {
@@ -16,35 +16,35 @@ pub struct MPRModel {
 
 impl MPRModel {
     pub fn is_feasible(&self) -> bool {
-        self.resource <= self.concurrency * self.period
+        self.resource <= self.concurrency as f64 * self.period
     }
 
     pub fn utilization(&self) -> f64 {
-        self.resource.as_raw() as f64 / self.period.as_raw() as f64
+        self.resource / self.period
     }
 }
 
 // Equation 1 [1]
 pub fn supply_bound_function(model: &MPRModel, time: Time) -> Time {
     #[inline(always)]
-    fn k(model: &MPRModel, time: Time) -> i64 {
-        Time::div_floor_time(
-            time - model.period + Time::div_ceil_i64(model.resource, model.concurrency),
+    fn k(model: &MPRModel, time: Time) -> f64 {
+        (
+            (time - model.period + (model.resource / model.concurrency as f64).ceil()) /
             model.period
-        )
+        ).floor()
     }
 
     #[allow(non_snake_case)]
     #[inline(always)]
     fn I(model: &MPRModel, time: Time) -> Time {
-        time - 2 * model.period + Time::div_ceil_i64(model.resource, model.concurrency)
+        time - 2.0 * model.period + (model.resource / model.concurrency as f64).ceil()
     }
 
     // sbf conditions
-    if time >= model.period - Time::div_ceil_i64(model.resource, model.concurrency) {
+    if time >= model.period - (model.resource / model.concurrency as f64).ceil() {
         k(model, time) * model.resource + Time::max(
             Time::zero(),
-            (I(model, time) - k(model, time) * model.period) * model.concurrency + model.resource
+            (I(model, time) - k(model, time) * model.period) * model.concurrency as f64 + model.resource
         )
     } else {
         Time::zero()
@@ -54,18 +54,8 @@ pub fn supply_bound_function(model: &MPRModel, time: Time) -> Time {
 // Equation 2 [1]
 pub fn linear_supply_bound_function(model: &MPRModel, interval: Time) -> Time {
     let (resource, period, concurrency) = (model.resource, model.period, model.concurrency);
-    
-    // integer arithmetics formula
-    Time::raw128(
-        resource.as_raw_128() * (interval - 2 * (period - resource / concurrency)).as_raw_128() / period.as_raw_128()
-    )
 
-    // floating-point arithmetics formula
-    // let (resource, interval, period, concurrency) =
-    //     (resource.as_nanos_f64(), interval.as_nanos_f64(), period.as_nanos_f64(), concurrency as f64);
-    // Time::nanos_f64(
-    //     resource * (interval - 2.0 * (period - resource / concurrency)) / period
-    // )
+    resource * (interval - 2.0 * (period - resource / concurrency as f64)) / period
 }
 
 // Extracted Theta from Equation 2 [1]
@@ -75,23 +65,10 @@ pub fn resource_from_linear_supply_bound(lsbf: Time, interval: Time, period: Tim
     // solutions or zero for a negative one.
     debug_assert!(lsbf >= Time::zero());
 
-    // integer arithmetics formula
-    let (lsbf, interval, period, cpus) =
-        (lsbf.as_raw_128(), interval.as_raw_128(), period.as_raw_128(), concurrency as i128);
-    let negb = 2 * period - interval;
-
-    Time::raw128(
-        cpus * (negb + num::integer::sqrt(negb*negb + 8 * period * lsbf / cpus)) / 4
-    )
-
     // floating-point arithmetics formula
-    // let (lsbf, interval, period, cpus) =
-    //     (lsbf.as_nanos_f64(), interval.as_nanos_f64(), period.as_nanos_f64(), concurrency as f64);
-    // let negb = 2.0 * period - interval;
+    let negb = 2.0 * period - interval;
 
-    // Time::nanos_f64(
-    //     cpus * (negb + f64::sqrt(negb*negb + 8.0 * period * lsbf / cpus)) / 4.0
-    // )
+    concurrency as f64 * (negb + Time::nanos( (negb * negb + 8.0 * period * lsbf / concurrency as f64).value().sqrt()) ) / 4.0
 }
 
 // global EDF for MPR ----------------------------------------------------------
@@ -125,7 +102,7 @@ fn num_processors_upper_bound(taskset: &[RTTask]) -> i64 {
         .min()
         .unwrap();
 
-    total_work / den + n
+    (total_work / den).floor() as i64 + n
 }
 
 // Equation 3 [1]
@@ -134,8 +111,8 @@ fn workload_upperbound(task: &RTTask, time: Time) -> Time {
 }
 
 // Equation 3 [1]
-fn activations_in_interval(task: &RTTask, time: Time) -> i64 {
-    Time::div_floor_time(time + task.period - task.deadline, task.period)
+fn activations_in_interval(task: &RTTask, time: Time) -> f64 {
+    ((time + task.period - task.deadline) / task.period).floor()
 }
 
 // Equation 3 [1]
@@ -201,14 +178,14 @@ fn demand(taskset: &[RTTask], k: usize, release: Time, num_processors: i64) -> T
         .collect();
 
     vec1.sort_unstable_by_key(|(_, ci)| *ci);
-    
+
     // get the num_processors - 1 carry_ins and compute interferences for those
     let sum1 = vec1.into_iter().rev()
         .take(num_processors as usize - 1)
         .map(|(i, _)| interference_flat(taskset, i) - interference_hat(taskset, i))
         .sum();
-   
-    sum0 + sum1 + num_processors * taskset[k].wcet
+
+    sum0 + sum1 + num_processors as f64 * taskset[k].wcet
 }
 
 // -----------------------------------------------------------------------------
@@ -222,7 +199,7 @@ impl MPRModel {
     pub fn to_periodic_tasks(&self) -> Vec<RTTask> {
         #[inline(always)]
         fn psi(model: &MPRModel) -> Time {
-            model.resource - model.concurrency * Time::div_floor_i64(model.resource, model.concurrency)
+            model.resource - model.concurrency as f64 * (model.resource / model.concurrency as f64).floor()
         }
 
         let k = psi(&self).as_nanos();
@@ -230,13 +207,13 @@ impl MPRModel {
         (0..self.concurrency)
             .map(|i| {
                 let wcet =
-                    if i <= k {
-                        Time::div_floor_i64(self.resource, self.concurrency) + Time::one()
-                    } else if i == k + 1 {
-                        Time::div_floor_i64(self.resource, self.concurrency)
-                            + psi(&self) - k * Time::div_floor_i64(psi(&self), k)
+                    if i <= k as i64 {
+                        (self.resource / self.concurrency as f64).floor() + Time::one()
+                    } else if i == k as i64 + 1 {
+                        (self.resource / self.concurrency as f64).floor()
+                            + psi(&self) - k * (psi(&self) / k).floor()
                     } else {
-                        Time::div_floor_i64(self.resource, self.concurrency)
+                        (self.resource / self.concurrency as f64).floor()
                     };
 
                 RTTask {
@@ -251,7 +228,7 @@ impl MPRModel {
     pub fn to_periodic_tasks_simple(&self) -> (RTTask, i64) {
         let task =
             RTTask {
-                wcet: Time::div_floor_i64(self.resource, self.concurrency) + Time::one(),
+                wcet: (self.resource / self.concurrency as f64).floor() + Time::one(),
                 deadline: self.period,
                 period: self.period,
             };
@@ -263,12 +240,12 @@ impl MPRModel {
 // Tests -----------------------------------------------------------------------
 #[test]
 fn test_lsbf() {
-    for resource in    (10 .. 1000).step_by(10).map(|ms| Time::millis(ms)) {
-    for period in      (10 .. 1000).step_by(10).map(|ms| Time::millis(ms)) {
-    for interval in    (10 .. 1000).step_by(10).map(|ms| Time::millis(ms)) {
+    for resource in    (10 .. 1000).step_by(10).map(|ms| Time::millis(ms as f64)) {
+    for period in      (10 .. 1000).step_by(10).map(|ms| Time::millis(ms as f64)) {
+    for interval in    (10 .. 1000).step_by(10).map(|ms| Time::millis(ms as f64)) {
     for concurrency in   1 .. 10 {
         // skip unfeasible models
-        if resource >= concurrency * period {
+        if resource >= concurrency as f64 * period {
             continue;
         }
 
@@ -279,7 +256,7 @@ fn test_lsbf() {
         }
 
         let inverse = resource_from_linear_supply_bound(lsbf, interval, period, concurrency);
-        assert_eq!(resource.as_nanos(), inverse.as_nanos());
+        assert_eq!(resource, inverse);
     }}}}
 }
 

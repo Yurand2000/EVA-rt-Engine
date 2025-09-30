@@ -3,7 +3,7 @@ use crate::prelude::*;
 #[derive(Clone)]
 #[derive(Debug)]
 pub enum Error {
-    
+
 }
 
 // Joseph, M. and Pandya, P., 1986. Finding response times in a real-time
@@ -34,27 +34,24 @@ pub fn is_schedulable(taskset: &[RTTask], buffered_inputs: bool) -> Result<bool,
 fn inputs(interval: (Time, Time), task: &RTTask) -> i64 {
     let (start, end) = interval;
 
-    f64::ceil( (end.as_nanos() as f64) / (task.period.as_nanos() as f64) ) as i64 - 
-    f64::ceil( (start.as_nanos() as f64) / (task.period.as_nanos() as f64) ) as i64
+    f64::ceil( end / task.period ) as i64 -
+    f64::ceil( start / task.period) as i64
 }
 
 // Function 3
 // Max computation time for the given task(sub)set in the given interval.
 fn comp(interval: (Time, Time), tasksubset: &[RTTask]) -> Time {
-    let total_computation_time =
-        tasksubset.iter()
+    tasksubset.iter()
         .take(tasksubset.len() - 1)
-        .map(|task| inputs(interval, task) * task.wcet.as_nanos())
-        .sum();
-
-    Time::nanos(total_computation_time)
+        .map(|task| inputs(interval, task) as f64 * task.wcet)
+        .sum()
 }
 
 // Condition 4
 fn avg_processing_load_is_met(tasksubset: &[RTTask]) -> bool {
     let hyperperiod = RTUtils::hyperperiod(tasksubset);
-    
-    let avg_load: Time = 
+
+    let avg_load: Time =
         tasksubset.iter()
         .take(tasksubset.len() - 1)
         .map(|task| hyperperiod / task.period * task.wcet )
@@ -90,10 +87,10 @@ fn example_1() {
         RTTask::new_ns(8, 40, 30),
     ];
 
-    assert_eq!(response_time(&taskset[0..=0]), Time::nanos(1));
-    assert_eq!(response_time(&taskset[0..=1]), Time::nanos(3));
-    assert_eq!(response_time(&taskset[0..=2]), Time::nanos(29));
-    assert_eq!(response_time(&taskset[0..=3]), Time::nanos(40));
+    assert_eq!(response_time(&taskset[0..=0]), Time::nanos(1.0));
+    assert_eq!(response_time(&taskset[0..=1]), Time::nanos(3.0));
+    assert_eq!(response_time(&taskset[0..=2]), Time::nanos(29.0));
+    assert_eq!(response_time(&taskset[0..=3]), Time::nanos(40.0));
 
     assert!(!is_schedulable(&taskset, false).unwrap());
     assert!(is_schedulable(&taskset, true).unwrap());
@@ -110,11 +107,11 @@ fn example_2() {
         RTTask::new_ns(1, 1000, 1000),
     ];
 
-    assert_eq!(response_time(&taskset[0..=0]), Time::nanos(40));
-    assert_eq!(response_time(&taskset[0..=1]), Time::nanos(100));
-    assert_eq!(response_time(&taskset[0..=2]), Time::nanos(560));
-    assert_eq!(response_time(&taskset[0..=3]), Time::nanos(2490));
-    assert_eq!(response_time(&taskset[0..=4]), Time::nanos(6991));
+    assert_eq!(response_time(&taskset[0..=0]), Time::nanos(40.0));
+    assert_eq!(response_time(&taskset[0..=1]), Time::nanos(100.0));
+    assert_eq!(response_time(&taskset[0..=2]), Time::nanos(560.0));
+    assert_eq!(response_time(&taskset[0..=3]), Time::nanos(2490.0));
+    assert_eq!(response_time(&taskset[0..=4]), Time::nanos(6991.0));
 
     assert!(!is_schedulable(&taskset, false).unwrap());
 }

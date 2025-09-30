@@ -44,13 +44,13 @@ pub fn gfb_test_sporadic(taskset: &[RTTask], num_processors: u64) -> Result<bool
 pub fn bak_test(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
-    fn beta(task_i: &RTTask, task_k: &RTTask) -> RTBandwidth {
-        let b0 = task_i.get_utilization() * (1.0 + (task_i.period - task_i.deadline).as_nanos_f64() / task_k.deadline.as_nanos_f64());
+    fn beta(task_i: &RTTask, task_k: &RTTask) -> f64 {
+        let b0 = task_i.utilization() * (1.0 + (task_i.period - task_i.deadline) / task_k.deadline);
 
-        if task_k.get_density() >= task_i.get_utilization() {
+        if task_k.density() >= task_i.utilization() {
             b0
         } else {
-            b0 + (task_i.wcet.as_nanos_f64() - task_k.get_density() * task_i.period.as_nanos_f64()) / task_k.deadline.as_nanos_f64()
+            b0 + (task_i.wcet - task_k.density() * task_i.period) / task_k.deadline
         }
     }
 
@@ -60,7 +60,7 @@ pub fn bak_test(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> 
                 .map(|task_i| f64::min(1.0, beta(task_i, task_k)))
                 .sum::<f64>()
             <=
-            num_processors as f64 * (1.0 - task_k.get_density()) + task_k.get_density()
+            num_processors as f64 * (1.0 - task_k.density()) + task_k.density()
         }))
 }
 
@@ -76,13 +76,13 @@ pub fn bcl_edf(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
     #[inline(always)]
-    fn num_jobs(task_i: &RTTask, task_k: &RTTask) -> i64 {
-        (task_k.deadline - task_i.deadline).div_floor_time(task_i.period) + 1
+    fn num_jobs(task_i: &RTTask, task_k: &RTTask) -> f64 {
+        ((task_k.deadline - task_i.deadline) / (task_i.period)).floor() + 1.0
     }
 
     #[inline(always)]
-    fn beta(task_i: &RTTask, task_k: &RTTask) -> RTBandwidth {
-        (num_jobs(task_i, task_k) * task_i.wcet + Time::min(task_i.wcet, (task_k.deadline - num_jobs(task_i, task_k) * task_i.period).positive_or_zero())).as_nanos_f64() / task_k.deadline.as_nanos_f64()
+    fn beta(task_i: &RTTask, task_k: &RTTask) -> f64 {
+        (num_jobs(task_i, task_k) * task_i.wcet + Time::min(task_i.wcet, (task_k.deadline - num_jobs(task_i, task_k) * task_i.period).positive_or_zero())) / task_k.deadline
     }
 
     Ok(taskset.iter().enumerate()
@@ -94,16 +94,16 @@ pub fn bcl_edf(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
                 .map(|(_, task_i)| {
                     let beta = beta(task_i, task_k);
 
-                    if beta > 0.0 && beta <= 1.0 - task_k.get_density() {
+                    if beta > 0.0 && beta <= 1.0 - task_k.density() {
                         beta_in_range = true;
                     }
 
                     beta
                 })
-                .map(|beta_i| f64::min(beta_i, 1.0 - task_k.get_density()))
+                .map(|beta_i| f64::min(beta_i, 1.0 - task_k.density()))
                 .sum::<f64>();
 
-            let cmp = num_processors as f64 * (1.0 - task_k.get_density());
+            let cmp = num_processors as f64 * (1.0 - task_k.density());
 
             sum < cmp || (sum == cmp && beta_in_range)
         }))
@@ -125,7 +125,7 @@ pub fn is_schedulable_generic_work_conserving(taskset: &[RTTask], num_processors
                 })
                 .sum();
 
-            ub < num_processors as i64 * (task_k.laxity() + Time::one())
+            ub < num_processors as f64 * (task_k.laxity() + Time::one())
         }))
 }
 
@@ -145,7 +145,7 @@ pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> Result<bool, E
                 })
                 .sum();
 
-            ub < num_processors as i64 * (task_k.laxity() + Time::one())
+            ub < num_processors as f64 * (task_k.laxity() + Time::one())
         }))
 }
 
@@ -163,7 +163,7 @@ pub fn is_schedulable_fixed_priority(taskset: &[RTTask], num_processors: u64) ->
                 })
                 .sum();
 
-            ub < num_processors as i64 * (task_k.laxity() + Time::one())
+            ub < num_processors as f64 * (task_k.laxity() + Time::one())
         }))
 }
 
@@ -173,10 +173,10 @@ fn workload_upperbound(interval: (Time, Time), task: &RTTask) -> Time {
 }
 
 // Section 4 Equation 5 [3]
-fn jobs_in_interval(interval: (Time, Time), task: &RTTask) -> i64 {
+fn jobs_in_interval(interval: (Time, Time), task: &RTTask) -> f64 {
     let length = interval.1 - interval.0;
 
-    (length + task.laxity()) / task.period
+    ((length + task.laxity()) / task.period).floor()
 }
 
 fn carry_in(interval: (Time, Time), task: &RTTask) -> Time {
@@ -211,7 +211,7 @@ fn slack_lb(taskset: &[RTTask], task_k: &RTTask, num_processors: i64) -> Time {
         })
         .sum();
 
-    task_k.laxity() - lb / num_processors
+    task_k.laxity() - lb / num_processors as f64
 }
 
 #[test]
@@ -254,8 +254,8 @@ fn example_2() {
 
     let num_processors = 2;
 
-    assert_eq!(workload_upperbound((Time::zero(), taskset[1].deadline), &taskset[0]), Time::nanos(10));
-    assert_eq!(workload_upperbound((Time::zero(), taskset[0].deadline), &taskset[1]), Time::nanos(1));
+    assert_eq!(workload_upperbound((Time::zero(), taskset[1].deadline), &taskset[0]), Time::nanos(10.0));
+    assert_eq!(workload_upperbound((Time::zero(), taskset[0].deadline), &taskset[1]), Time::nanos(1.0));
     // it should fail, as says in the paper, but it doesn't. Numbers seem ok
     // assert!(!is_schedulable_generic_work_conserving(&taskset, num_processors).unwrap());
 }
