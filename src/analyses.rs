@@ -15,8 +15,8 @@ pub mod response_time_analysis;
 
 // Multi Processor analyses
 pub mod smp_generic;
-pub mod smp_edf;
-pub mod smp_fp;
+pub mod smp_earliest_deadline_first;
+pub mod smp_fixed_priority;
 pub mod multiprocessor_resource_model;
 
 #[derive(Clone)]
