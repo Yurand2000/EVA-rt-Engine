@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 pub mod bcl_2009;
+pub mod baruah_2007;
 
 /// Goossens, J., Funk, S. and Baruah, S., 2003. Priority-driven scheduling of
 /// periodic task systems on multiprocessors. Real-time systems, 25(2),

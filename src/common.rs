@@ -111,6 +111,14 @@ impl Ord for Time {
     }
 }
 
+impl std::ops::Neg for Time {
+    type Output = Time;
+
+    fn neg(self) -> Self::Output {
+        Self::Output { value_ns: -self.value_ns }
+    }
+}
+
 impl std::ops::Add for Time {
     type Output = Time;
 
@@ -159,9 +167,36 @@ impl std::ops::Div<f64> for Time {
     }
 }
 
+impl std::ops::Rem for Time {
+    type Output = f64;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        self.value_ns.floor() % rhs.value_ns.floor()
+    }
+}
+
 impl std::iter::Sum for Time {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Time::zero(), |acc, val| acc + val)
+    }
+}
+
+impl std::iter::Step for Time {
+    fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
+        if start > end {
+            (0, None)
+        } else {
+            let steps = (*end - *start).value_ns as usize;
+            (steps, Some(steps))
+        }
+    }
+
+    fn forward_checked(start: Self, count: usize) -> Option<Self> {
+        Some(Time { value_ns: start.value_ns + count as f64 })
+    }
+
+    fn backward_checked(start: Self, count: usize) -> Option<Self> {
+        Some(Time { value_ns: start.value_ns - count as f64 })
     }
 }
 
@@ -303,6 +338,14 @@ impl Time2 {
 
     pub fn value(&self) -> f64 {
         self.value
+    }
+}
+
+impl std::ops::Neg for Time2 {
+    type Output = Time2;
+
+    fn neg(self) -> Self::Output {
+        Self::Output { value: -self.value }
     }
 }
 
