@@ -1,5 +1,4 @@
 pub mod prelude {
-    pub use super::taskset_serde::prelude::*;
     pub use super::{
         Time,
         Time2,
@@ -7,8 +6,6 @@ pub mod prelude {
         RTUtils,
     };
 }
-
-pub mod taskset_serde;
 
 #[derive(Debug)]
 #[derive(Clone, Copy)]

@@ -1,3 +1,5 @@
+use clap::builder::Str;
+
 use crate::prelude::*;
 
 pub mod prelude {
@@ -23,6 +25,7 @@ pub mod multiprocessor_resource_model;
 #[derive(Debug)]
 pub enum Error {
     Generic(String),
+    Precondition(String),
     NotOrderedByPeriod,
     NotOrderedByDeadline,
     NonImplicitDeadlines,
@@ -33,10 +36,11 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::Generic(err) => write!(f, "Analysis error: {err}"),
-            Error::NotOrderedByPeriod => write!(f, "Analysis error: taskset not ordered by period"),
-            Error::NotOrderedByDeadline => write!(f, "Analysis error: taskset not ordered by deadline"),
-            Error::NonImplicitDeadlines => write!(f, "Analysis error: taskset must have implicit deadlines"),
-            Error::NonConstrainedDeadlines => write!(f, "Analysis error: taskset must have constrained deadlines"),
+            Error::Precondition(err) => write!(f, "Analysis precondition error: {err}"),
+            Error::NotOrderedByPeriod => write!(f, "Analysis precondition error: taskset not ordered by period"),
+            Error::NotOrderedByDeadline => write!(f, "Analysis precondition error: taskset not ordered by deadline"),
+            Error::NonImplicitDeadlines => write!(f, "Analysis precondition error: taskset must have implicit deadlines"),
+            Error::NonConstrainedDeadlines => write!(f, "Analysis precondition error: taskset must have constrained deadlines"),
         }
     }
 }

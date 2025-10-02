@@ -1,8 +1,8 @@
 use crate::prelude::*;
 
-// Leung, J.Y.T. and Whitehead, J., 1982. On the complexity of fixed-priority
-// scheduling of periodic, real-time tasks. Performance evaluation, 2(4),
-// pp.237-250.
+/// Leung, J.Y.T. and Whitehead, J., 1982. On the complexity of fixed-priority
+/// scheduling of periodic, real-time tasks. Performance evaluation, 2(4),
+/// pp.237-250.
 pub fn is_schedulable_pessimistic(taskset: &[RTTask]) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_ordered_by_deadline(taskset)?;
@@ -18,6 +18,9 @@ pub fn is_schedulable_pessimistic(taskset: &[RTTask]) -> Result<bool, Error> {
     Ok(utilization <= utilization_bound)
 }
 
+/// Leung, J.Y.T. and Whitehead, J., 1982. On the complexity of fixed-priority
+/// scheduling of periodic, real-time tasks. Performance evaluation, 2(4),
+/// pp.237-250.
 pub fn is_schedulable(taskset: &[RTTask]) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_ordered_by_deadline(taskset)?;
