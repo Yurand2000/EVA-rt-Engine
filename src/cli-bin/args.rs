@@ -43,6 +43,10 @@ pub struct SchedulerSpecification {
     #[arg(short='n', value_name="# CPUs")]
     pub num_processors: Option<u64>,
 
+    /// Specific Test
+    #[arg(long="test", value_name="TEST NAME")]
+    pub specific_test: Option<String>,
+
     /// Config file
     #[arg(short='c', value_name="CONFIG FILE")]
     pub config_file: Option<String>,

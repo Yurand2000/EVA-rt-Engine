@@ -73,14 +73,25 @@ fn check_analysis_args(algorithm: &SchedulingAlgorithm, num_cpus: u64) -> Result
     }
 }
 
+#[derive(serde::Deserialize)]
+struct SchedulerSpecification {
+    pub algorithm: SchedulingAlgorithm,
+    pub num_processors: u64,
+    pub specific_test: Option<String>,
+}
+
 fn main_wo_exit_code(args: Args) -> Result<bool, Box<dyn std::error::Error>> {
     use SchedulingAlgorithm::*;
 
     let taskset = parse_taskset(&args.taskset_args.taskset_file, args.taskset_args.taskset_file_ty)?;
 
-    let (algorithm, num_cpus) =
+    let scheduler: SchedulerSpecification =
         args.scheduler_specification.algorithm.and_then(|algo| -> Option<Result<_, Box<dyn std::error::Error>>> {
-            Some( Ok((algo, args.scheduler_specification.num_processors.unwrap())) )
+            Some( Ok(SchedulerSpecification {
+                algorithm: algo,
+                num_processors: args.scheduler_specification.num_processors.unwrap(),
+                specific_test: args.scheduler_specification.specific_test,
+            } ))
         }).unwrap_or_else(|| {
             std::fs::read_to_string(args.scheduler_specification.config_file.unwrap())
                 .map_err(|err| format!("Config parse error: {err}").into())
@@ -90,12 +101,14 @@ fn main_wo_exit_code(args: Args) -> Result<bool, Box<dyn std::error::Error>> {
                 })
         })?;
 
-    check_analysis_args(&algorithm, num_cpus)?;
+    check_analysis_args(&scheduler.algorithm, scheduler.num_processors)?;
 
-    match algorithm {
-        UpEDF => analyses::uniprocessor_edf(&taskset, args.quiet),
-        UpFP => analyses::uniprocessor_fp(&taskset, args.quiet),
-        GlobalEDF => analyses::global_earliest_deadline_first(&taskset, num_cpus, args.quiet),
-        GlobalFP => analyses::global_fixed_priority(&taskset, num_cpus, args.quiet),
+    let single_test = scheduler.specific_test.as_deref();
+    let num_cpus = scheduler.num_processors;
+    match scheduler.algorithm {
+        UpEDF => analyses::uniprocessor_edf(&taskset, single_test, args.quiet),
+        UpFP => analyses::uniprocessor_fp(&taskset, single_test, args.quiet),
+        GlobalEDF => analyses::global_earliest_deadline_first(&taskset, num_cpus, single_test, args.quiet),
+        GlobalFP => analyses::global_fixed_priority(&taskset, num_cpus, single_test, args.quiet),
     }
 }
