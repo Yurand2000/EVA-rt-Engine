@@ -62,7 +62,7 @@ fn demand_bound_function(task: &RTTask, interval: Time) -> Time {
 
 #[allow(non_snake_case)]
 // Section 6, Equation 3 [1]
-fn interference_1(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, Ak: Time, dbfs: &[Time]) -> Time {
+fn interference_1(i: usize, _task_i: &RTTask, k: usize, task_k: &RTTask, Ak: Time, dbfs: &[Time]) -> Time {
     // let dbf = demand_bound_function(task_i, Ak + task_k.deadline);
     let dbf = dbfs[i];
 
