@@ -225,14 +225,17 @@ impl RTTask {
         }
     }
 
+    /// wcet / period
     pub fn utilization(&self) -> f64 {
         self.wcet.value_ns / self.period.value_ns
     }
 
+    /// wcet / deadline
     pub fn density(&self) -> f64 {
         self.wcet.value_ns / self.deadline.value_ns
     }
 
+    /// deadline - wcet
     pub fn laxity(&self) -> Time {
         self.deadline - self.wcet
     }

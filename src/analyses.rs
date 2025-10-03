@@ -7,17 +7,21 @@ pub mod prelude {
     };
 }
 
-// Single Processor analyses
+// Single Processor scheduling
 pub mod up_fixed_priority;
 pub mod up_earliest_deadline_first;
 
 pub mod response_time_analysis;
 
-// Multi Processor analyses
+// Single Processor Hierarchical scheduling
+
+// Multi Processor scheduling
 pub mod smp_generic;
 pub mod smp_earliest_deadline_first;
 pub mod smp_fixed_priority;
-pub mod multiprocessor_resource_model;
+
+// Multi Processor Hierarchical scheduling
+pub mod multiprocessor_periodic_resource_model;
 
 #[derive(Clone)]
 #[derive(Debug)]
