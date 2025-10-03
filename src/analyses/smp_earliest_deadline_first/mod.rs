@@ -7,9 +7,11 @@ pub mod baruah_2007;
 /// periodic task systems on multiprocessors. Real-time systems, 25(2),
 /// pp.187-205. *Theorem 5*
 ///
-/// **Notes:**
+/// **Prerequisites:**
 /// - Periodic tasks.
 /// - Implicit deadlines.
+///
+/// **Worst-Case Complexity:** *O(n)*
 pub fn gfb_test_periodic(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_implicit_deadlines(taskset)?;
 
@@ -24,9 +26,11 @@ pub fn gfb_test_periodic(taskset: &[RTTask], num_processors: u64) -> Result<bool
 /// Systems (ECRTS’05), July 2005, pp. 209–218. doi: 10.1109/ECRTS.2005.18.
 /// *Theorem 4, Equation 5*
 ///
-/// **Notes:**
+/// **Prerequisites:**
 /// - Sporadic tasks.
 /// - Constrained deadlines.
+///
+/// **Worst-Case Complexity:** *O(n)*
 pub fn gfb_test_sporadic(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
@@ -41,9 +45,11 @@ pub fn gfb_test_sporadic(taskset: &[RTTask], num_processors: u64) -> Result<bool
 /// Systems (ECRTS’05), July 2005, pp. 209–218. doi: 10.1109/ECRTS.2005.18.
 /// *Theorem 5, Equation 6*
 ///
-/// **Notes:**
+/// **Prerequisites:**
 /// - Sporadic tasks.
 /// - Constrained deadlines.
+///
+/// **Worst-Case Complexity:** *O(n^3)*
 pub fn bak_test(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
@@ -72,9 +78,11 @@ pub fn bak_test(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> 
 /// Systems (ECRTS’05), July 2005, pp. 209–218. doi: 10.1109/ECRTS.2005.18.
 /// *Theorem 7, Equation 8*
 ///
-/// **Notes:**
+/// **Prerequisites:**
 /// - Sporadic tasks.
 /// - Constrained deadlines.
+///
+/// **Worst-Case Complexity:** *O(n^2)*
 pub fn bcl_edf(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 

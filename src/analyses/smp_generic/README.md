@@ -2,8 +2,6 @@
 
 [**🏠 Go back to all analyses**](../../../README.md#-available-analyses)
 
-🚧 Under Construction 🚧
-
 ### 🧪 Implemented Analyses
 
 ---

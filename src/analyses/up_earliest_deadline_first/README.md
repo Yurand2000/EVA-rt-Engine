@@ -2,19 +2,17 @@
 
 [**🏠 Go back to all analyses**](../../../README.md#-available-analyses)
 
-This module checks if the taskset is schedulable using the **Earliest Deadline First** algorithm on a **UniProcessor** System.
-
-### 🔑 Preconditions
-
----
-
-- Implicit deadlines.
-
 ### 🧪 Implemented Analyses
 
 ---
 
 - **Liu & Layland** (1973) [^1]
+
+    Preconditions:
+    - Periodic tasks
+    - Implicit deadlines
+
+    Worst-Case Complexity: *O(n)*
 
 ### 📚 References
 

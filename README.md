@@ -28,35 +28,33 @@ The analysis software requires an *input file* describing the *taskset* (availab
 10 20 20
 1 30 30
 
-# Run UniProcessor Rate Monotonic test
-> cargo run -- -i taskset00.txt rate-monotonic
-Analysis Output: Schedulable
-
-# Some of the analyses may have additional options
-> cargo run -- rate-monotonic --help
-UniProcessor Rate Monotonic
-[...]
-Usage: analyzer -i <filename> rate-monotonic [type]
-Arguments:
-  [type]    Analysis to run
-            [default: classic]
-            [possible values: classic, simple, hyperbolic]
-[...]
-
-> cargo run -- -i taskset00.txt rate-monotonic hyperbolic
-Analysis Output: Schedulable
+# Run UniProcessor Fixed Priority Test
+> cargo run -- -i taskset00.txt -a up-fp -n 1
+Rate Monotonic - Liu & Layland 1973 (Simplified): Pass
 ```
 
 ```bash
 # Help screen (prefer --help to -h as you can get more information)
 > cargo run -- --help
-Usage: analyzer [OPTIONS] -i <filename> [COMMAND]
-Commands:
-  rate-monotonic  UniProcessor Rate Monotonic
-  [...]
-  help            Print this message or the help of the given subcommand(s)
+Usage: eva-engine-cli [OPTIONS] -i <TASKSET FILE> <-a <ALGORITHM>|-n <n. CPUs>|--test <TEST NAME>|-c <CONFIG FILE>>
+
 Options:
-  -i <filename>   Taskset data file
+  -q          Quiet mode / Exit code as analysis result
+  -h, --help  Print help (see a summary with '-h')
+
+Scheduling Algorithm Specification:
+  -a <ALGORITHM>      Scheduling Algorithm
+                      [possible values:
+                        up-edf,
+                        up-fp,
+                        global-edf,
+                        global-fp]
+  -n <n. CPUs>        Number of processors
+  --test <TEST NAME>  Specific Test
+  -c <CONFIG FILE>    Config file
+
+Taskset Specification:
+  -i <TASKSET FILE>     Taskset data file
 [...]
 ```
 
@@ -66,16 +64,16 @@ It is possible to use configuration files to specify which analyses to run, usef
 
 ```bash
 # Example config for UniProcessor Rate Monotonic
-> cat examples/up_rate_monotonic/config_hyperbolic.json
+> cat examples/up_fixed_priority/rate_monotonic/config_hyperbolic.json
 {
-    "rate-monotonic": {
-        "typ": "hyperbolic"
-    }
+    "algorithm": "UpFP",
+    "num_processors": 1,
+    "specific_test": "rm-hyperbolic"
 }
 
 # Run the analyzer with the config
 > cargo run -- -i taskset.txt -c config_hyperbolic.json
-Analysis Output: Schedulable
+Rate Monotonic - Bini, Buttazzo, Buttazzo 2001: Pass
 ```
 
 Another interesting command line option is `-q` for *quiet*, which is still useful for scripts and automatic tasks. Basically, the option suppresses the output to *stdout* and *stderr* (unless a argument error occurs), and the analyzer exits with **0** (zero) when the taskset is deemed schedulable, **1** when it is not schedulable, and any other exit code to signal taskset parsing errors or other analysis specific errors (as an example, unmatched preconditions for certain analyses).
@@ -120,19 +118,20 @@ This taskset is comprised of 3 tasks. The highest priority task (if using *fixed
 
 ## 🔬 Available Analyses
 
-### Single Processor Analyses
+### Uni-Processor Analyses
 
 *References are available in the individual sub-pages*
 
-- [**Rate Monotonic**](src/analyses/up_rate_monotonic/README.md)
+- Fixed Priority
+  - [**Rate Monotonic**](src/analyses/up_fixed_priority/rate_monotonic/README.md)
+  - [**Deadline Monotonic**](src/analyses/up_fixed_priority/deadline_monotonic/README.md)
 - [**Earliest Deadline First**](src/analyses/up_earliest_deadline_first/README.md)
-- [**Deadline Monotonic**](src/analyses/up_deadline_monotonic/README.md)
-- [**Response Time Analysis**](src/analyses/response_time_analysis/README.md)
 
-### Multi Processor Analyses
+### Multi-Processor Analyses
 
-- [**Global Deadline Monotonic**](src/analyses/smp_dm/README.md)
-- [**Global Earliest Deadline First**](src/analyses/smp_edf/README.md)
+- Global Fixed Priority
+  - [**Deadline Monotonic**](src/analyses/smp_fixed_priority/deadline_monotonic/README.md)
+- [**Global Earliest Deadline First**](src/analyses/smp_earliest_deadline_first/README.md)
 
 ## 📄 License
 

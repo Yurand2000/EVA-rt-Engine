@@ -1,21 +1,20 @@
 # SMP Global Deadline Monotonic
 
-[**🏠 Go back to all analyses**](../../../README.md#-available-analyses)
+[**🏠 Go back to all analyses**](../../../../README.md#-available-analyses)
 
 🚧 Under Construction 🚧
-
-### 🔑 Preconditions
-
----
-
-- Taskset sorted by deadlines.
-- Constrained deadlines.
 
 ### 🧪 Implemented Analyses
 
 ---
 
 - **Bertogna, Cirinei and Lipari** (2005) [^1]
+
+    Preconditions:
+    - Constrained deadlines
+    - Taskset sorted by deadlines
+
+    Worst-Case Complexity: *O(n)*
 
 ### 📚 References
 

@@ -1,21 +1,19 @@
 # UniProcessor Deadline Monotonic
 
-[**🏠 Go back to all analyses**](../../../README.md#-available-analyses)
-
-This module checks if the **Deadline Monotonic** priority assignment for **Fixed-Priority Scheduling** is suitable for the given taskset on a **UniProcessor** System.
-
-### 🔑 Preconditions
-
----
-
-- Taskset sorted by deadlines.
-- Constrained deadlines.
+[**🏠 Go back to all analyses**](../../../../README.md#-available-analyses)
 
 ### 🧪 Implemented Analyses
 
 ---
 
 - **Leung & Whitehead** (1982) [^1]
+
+    Preconditions:
+    - Periodic Tasks
+    - Constrained deadlines
+    - Taskset sorted by deadline
+
+    Worst-Case Complexity: *O(n)*
 
 ### 📚 References
 

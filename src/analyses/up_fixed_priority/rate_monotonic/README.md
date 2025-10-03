@@ -1,23 +1,37 @@
 # UniProcessor Rate Monotonic
 
-[**🏠 Go back to all analyses**](../../../README.md#-available-analyses)
-
-This module checks if the **Rate Monotonic** priority assignment for **Fixed-Priority Scheduling** is suitable for the given taskset on a **UniProcessor** System.
-
-### 🔑 Preconditions
-
----
-
-- Taskset sorted by period.
-- Implicit deadlines.
+[**🏠 Go back to all analyses**](../../../../README.md#-available-analyses)
 
 ### 🧪 Implemented Analyses
 
 ---
 
 - **Classic** - *Liu & Layland* (1973) [^1]
+
+    Preconditions:
+    - Periodic Tasks
+    - Implicit deadlines
+    - Taskset sorted by period
+
+    Worst-Case Complexity: *O(n)*
+
 - **Classic Simple** - *Liu & Layland* (1973) [^1], i.e. worst case bound for any number of tasks
+
+    Preconditions:
+    - Periodic Tasks
+    - Implicit deadlines
+    - Taskset sorted by period
+
+    Worst-Case Complexity: *O(n)*
+
 - **Hyperbolic Bound** - *Bini, Buttazzo and Buttazzo* (2001) [^2]
+
+    Preconditions:
+    - Periodic Tasks
+    - Implicit deadlines
+    - Taskset sorted by period
+
+    Worst-Case Complexity: *O(n)*
 
 ### 📚 References
 

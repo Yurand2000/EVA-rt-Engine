@@ -29,8 +29,8 @@ pub fn global_earliest_deadline_first(taskset: &[RTTask], num_processors: u64, s
 
     let tests: &[(_, _, fn(&[RTTask], u64) -> Result<bool, Error> )] = &[
         ("gbf", "GBF Test", gfb_test_sporadic),
-        ("bak", "BAK Test", bak_test),
         ("bcl", "BCL Test", bcl_edf),
+        ("bak", "BAK Test", bak_test),
         ("baruah", "Baruah Test", baruah_2007::baruah_test),
     ];
 

@@ -7,9 +7,12 @@ use crate::prelude::*;
 /// AZ, USA: IEEE, Dec. 2007, pp. 119–128. doi: 10.1109/RTSS.2007.35.
 /// *Section 5, Theorem 2, Equation 8*
 ///
-/// **Notes:**
+/// **Prerequisites:**
 /// - Sporadic tasks.
 /// - Constrained deadlines.
+///
+/// **Worst-Case Complexity:** Pseudo-Polynomial *O(n \* m)* where *n* is the number of
+/// tasks and *m* is the number of processors.
 pub fn baruah_test(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;

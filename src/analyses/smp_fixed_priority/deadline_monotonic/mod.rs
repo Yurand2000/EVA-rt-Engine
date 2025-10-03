@@ -5,6 +5,12 @@ use crate::prelude::*;
 /// multiprocessors. In International Conference on Principles of Distributed
 /// Systems (pp. 306-321). Berlin, Heidelberg: Springer Berlin Heidelberg.
 /// **Theorem 5**
+///
+/// **Prerequisites:**
+/// - Constrained deadlines.
+/// - Ordered by deadline.
+///
+/// **Worst-Case Complexity:** *O(n)*
 pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_ordered_by_deadline(taskset)?;
