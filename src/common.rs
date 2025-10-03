@@ -178,25 +178,6 @@ impl std::iter::Sum for Time {
     }
 }
 
-impl std::iter::Step for Time {
-    fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
-        if start > end {
-            (0, None)
-        } else {
-            let steps = (*end - *start).value_ns as usize;
-            (steps, Some(steps))
-        }
-    }
-
-    fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        Some(Time { value_ns: start.value_ns + count as f64 })
-    }
-
-    fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        Some(Time { value_ns: start.value_ns - count as f64 })
-    }
-}
-
 impl serde::Serialize for Time {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

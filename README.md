@@ -6,7 +6,7 @@
 
 ### Prerequisites
 
-- **Rust**: ≥1.?.?-nightly
+- **Rust**: ≥1.85.0
 
 ### Installation
 

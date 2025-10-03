@@ -79,4 +79,16 @@ impl AnalysisUtils {
             Err(Error::NonConstrainedDeadlines)
         }
     }
+
+    pub fn assert_integer_times(taskset: &[RTTask]) -> Result<(), Error> {
+        if taskset.iter().all(|task| {
+            task.wcet.as_nanos().fract() < 1e-10 &&
+            task.deadline.as_nanos().fract() < 1e-10 &&
+            task.period.as_nanos().fract() < 1e-10
+        }) {
+            Ok(())
+        } else {
+            Err(Error::Precondition(format!("Required integer times for task's parameters")))
+        }
+    }
 }
