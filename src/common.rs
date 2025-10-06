@@ -165,10 +165,10 @@ impl std::ops::Div<f64> for Time {
 }
 
 impl std::ops::Rem for Time {
-    type Output = f64;
+    type Output = Time;
 
     fn rem(self, rhs: Self) -> Self::Output {
-        self.value_ns.floor() % rhs.value_ns.floor()
+        Self::Output { value_ns: self.value_ns.floor() % rhs.value_ns.floor() }
     }
 }
 

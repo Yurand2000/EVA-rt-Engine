@@ -18,13 +18,39 @@ pub fn baruah_test(taskset: &[RTTask], num_processors: u64) -> Result<bool, Erro
     // As in [1]: It can also be shown that Condition 8 need only be tested at
     // those values of Ak at which DBF(tak_i, Ak + Dk) (and DBF') changes for
     // some task_i.
+    //
+    // Both functions change their output value on a periodic pattern: let C <=
+    // D <= T, for task i where to compute the DBFs. The values change in the
+    // range [0 + aT, C + aT] and at {D + aT} for all integers a. The union of
+    // these ranges is the points where we actually need to perform the test.
     Ok(taskset.iter().enumerate().all(|(k, task_k)| {
         let ak_upperbound = arrival_k_upperbound(taskset, task_k, num_processors).ceil();
 
         (0 ..= ak_upperbound.ceil().as_nanos() as usize)
-            .all(|arrival_k| {
-                baruah_test_single(taskset, k, task_k, Time::nanos(arrival_k as f64), num_processors)
+            .map(|arrival_k| Time::nanos(arrival_k as f64))
+            .filter(|arrival_k| {
+                // Perform the test only where DBF/DBF' values change.
+                taskset.iter().any(|task_i| {
+                    let interval = *arrival_k + task_k.deadline;
+                    let modulus = interval % task_i.period;
+
+                    modulus <= task_i.wcet || modulus == task_i.deadline
+                })
             })
+            .all(|arrival_k| baruah_test_single(taskset, k, task_k, arrival_k, num_processors))
+    }))
+}
+
+pub fn baruah_test_simple(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
+    AnalysisUtils::assert_constrained_deadlines(taskset)?;
+    AnalysisUtils::assert_integer_times(taskset)?;
+
+    Ok(taskset.iter().enumerate().all(|(k, task_k)| {
+        let ak_upperbound = arrival_k_upperbound(taskset, task_k, num_processors).ceil();
+
+        (0 ..= ak_upperbound.ceil().as_nanos() as usize)
+            .map(|arrival_k| Time::nanos(arrival_k as f64))
+            .all(|arrival_k| baruah_test_single(taskset, k, task_k, arrival_k, num_processors))
     }))
 }
 
@@ -58,7 +84,7 @@ fn interference_1(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, arrival_
 
 // Section 6, Equation 4 [1]
 fn demand_bound_function_2(task: &RTTask, interval: Time) -> Time {
-    (interval / task.period).floor() * task.wcet + Time::min(task.wcet, Time::nanos(interval % task.period))
+    (interval / task.period).floor() * task.wcet + Time::min(task.wcet, interval % task.period)
 }
 
 // Section 6, Equation 5 [1]
@@ -86,6 +112,22 @@ fn arrival_k_upperbound(taskset: &[RTTask], task_k: &RTTask, num_processors: u64
         + num_processors as f64 * task_k.wcet)
     /
         (num_processors as f64 - total_utilization)
+}
+
+#[test]
+pub fn simple_vs_optimized() {
+    let taskset = [
+        RTTask::new_ns(35, 90, 160),
+        RTTask::new_ns(70, 115, 160),
+        RTTask::new_ns(30, 50, 75),
+    ];
+
+    let num_processors = 1;
+
+    assert_eq!(
+        baruah_test(&taskset, num_processors).unwrap(),
+        baruah_test_simple(&taskset, num_processors).unwrap()
+    );
 }
 
 /* -----------------------------------------------------------------------------
