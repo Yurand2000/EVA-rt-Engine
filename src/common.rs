@@ -1,4 +1,5 @@
 pub mod prelude {
+    pub use super::binary_search::prelude::*;
     pub use super::{
         Time,
         Time2,
@@ -6,6 +7,8 @@ pub mod prelude {
         RTUtils,
     };
 }
+
+pub mod binary_search;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Time {
