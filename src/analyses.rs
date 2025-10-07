@@ -8,23 +8,22 @@ pub mod prelude {
 }
 
 // Single Processor scheduling
-pub mod up_fixed_priority;
 pub mod up_earliest_deadline_first;
+pub mod up_fixed_priority;
 
 pub mod response_time_analysis;
 
 // Single Processor Hierarchical scheduling
 
 // Multi Processor scheduling
-pub mod smp_generic;
 pub mod smp_earliest_deadline_first;
 pub mod smp_fixed_priority;
+pub mod smp_generic;
 
 // Multi Processor Hierarchical scheduling
 pub mod multiprocessor_periodic_resource_model;
 
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Error {
     Generic(String),
     Precondition(String),
@@ -37,12 +36,18 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Generic(err) => write!(f, "Analysis error: {err}"),
-            Error::Precondition(err) => write!(f, "Analysis precondition error: {err}"),
-            Error::NotOrderedByPeriod => write!(f, "Analysis precondition error: taskset not ordered by period"),
-            Error::NotOrderedByDeadline => write!(f, "Analysis precondition error: taskset not ordered by deadline"),
-            Error::NonImplicitDeadlines => write!(f, "Analysis precondition error: taskset must have implicit deadlines"),
-            Error::NonConstrainedDeadlines => write!(f, "Analysis precondition error: taskset must have constrained deadlines"),
+            Error::Generic(err) =>
+                write!(f, "Analysis error: {err}"),
+            Error::Precondition(err) =>
+                write!(f, "Analysis precondition error: {err}"),
+            Error::NotOrderedByPeriod =>
+                write!(f, "Analysis precondition error: taskset not ordered by period"),
+            Error::NotOrderedByDeadline =>
+                write!(f, "Analysis precondition error: taskset not ordered by deadline"),
+            Error::NonImplicitDeadlines =>
+                write!(f, "Analysis precondition error: taskset must have implicit deadlines"),
+            Error::NonConstrainedDeadlines =>
+                write!(f, "Analysis precondition error: taskset must have constrained deadlines"),
         }
     }
 }

@@ -38,9 +38,12 @@ pub fn supply_bound_function(model: &MPRModel, time: Time) -> Time {
 
     // sbf conditions
     if time >= model.period - (model.resource / model.concurrency as f64).ceil() {
-        k(model, time) * model.resource + Time::max(
+        k(model, time) * model.resource
+            +
+        Time::max(
             Time::zero(),
-            (I(model, time) - k(model, time) * model.period) * model.concurrency as f64 + model.resource
+            (I(model, time) - k(model, time) * model.period)
+                * model.concurrency as f64 + model.resource
         )
     } else {
         Time::zero()
@@ -61,10 +64,11 @@ pub fn resource_from_linear_supply_bound(lsbf: Time, interval: Time, period: Tim
     // solutions or zero for a negative one.
     debug_assert!(lsbf >= Time::zero());
 
-    // floating-point arithmetics formula
+    let concurrency = concurrency as f64;
     let negb = 2.0 * period - interval;
+    let bsqr = negb * negb;
 
-    concurrency as f64 * (negb + Time::nanos( (negb * negb + 8.0 * period * lsbf / concurrency as f64).value().sqrt()) ) / 4.0
+    concurrency * (negb + Time2::sqrt(bsqr + 8.0 * period * lsbf / concurrency) ) / 4.0
 }
 
 // global EDF for MPR ----------------------------------------------------------
@@ -142,8 +146,10 @@ fn arrival_k_upperbound_edf(taskset: &[RTTask], task_k: &RTTask, model: &MPRMode
     let c_sum: Time = wcets.into_iter().rev().take(model.concurrency as usize - 1).sum();
     let taskset_utilization = RTUtils::total_utilization(taskset);
 
-    let u_sum: Time = taskset.iter().map(|task| (task.period - task.deadline) * task.utilization()).sum();
-    let b_sum: Time = model.resource * (2.0 - (2.0 * model.resource) / (model.concurrency as f64 * model.period));
+    let u_sum: Time = taskset.iter()
+        .map(|task| (task.period - task.deadline) * task.utilization()).sum();
+    let b_sum: Time =
+        model.resource * (2.0 - (2.0 * model.resource) / (model.concurrency as f64 * model.period));
 
     (
         c_sum
@@ -310,7 +316,13 @@ fn activations_in_interval_edf(task: &RTTask, time: Time) -> f64 {
 // Equation 3 [1]
 #[inline(always)]
 fn carry_in_edf(task: &RTTask, time: Time) -> Time {
-    Time::min(task.wcet, Time::max(Time::zero(), time - activations_in_interval_edf(task, time) * task.period))
+    Time::min(
+        task.wcet,
+        Time::max(
+            Time::zero(),
+            time - activations_in_interval_edf(task, time) * task.period
+        )
+    )
 }
 
 // -----------------------------------------------------------------------------
@@ -324,7 +336,8 @@ impl MPRModel {
     pub fn to_periodic_tasks(&self) -> Vec<RTTask> {
         #[inline(always)]
         fn psi(model: &MPRModel) -> Time {
-            model.resource - model.concurrency as f64 * (model.resource / model.concurrency as f64).floor()
+            model.resource - model.concurrency as f64 *
+                (model.resource / model.concurrency as f64).floor()
         }
 
         let k = psi(&self).as_nanos();
@@ -374,7 +387,11 @@ fn test_lsbf() {
             continue;
         }
 
-        let lsbf = linear_supply_bound_function(&MPRModel { resource, period, concurrency }, interval);
+        let lsbf = linear_supply_bound_function(
+            &MPRModel { resource, period, concurrency },
+            interval
+        );
+
         // skip negative supply values
         if lsbf < Time::zero() {
             continue;

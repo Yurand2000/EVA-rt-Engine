@@ -7,19 +7,17 @@ pub mod prelude {
     };
 }
 
-#[derive(Debug)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Time {
-    value_ns: f64
+    value_ns: f64,
 }
 
 #[derive(Clone, Copy)]
 pub struct Time2 {
-    value: f64
+    value: f64,
 }
 
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct RTTask {
     pub wcet: Time,
@@ -77,10 +75,6 @@ impl Time {
 
     pub fn round(self) -> Self {
         Self { value_ns: f64::round(self.value_ns) }
-    }
-
-    pub fn positive_or_zero(self) -> Self {
-        Time::max(self, Time::zero())
     }
 }
 
@@ -181,7 +175,8 @@ impl std::iter::Sum for Time {
 impl serde::Serialize for Time {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
+        S: serde::Serializer,
+    {
         format!("{} ns", self.value_ns).serialize(serializer)
     }
 }
@@ -189,7 +184,8 @@ impl serde::Serialize for Time {
 impl<'de> serde::Deserialize<'de> for Time {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de> {
+        D: serde::Deserializer<'de>,
+    {
         let time_string = String::deserialize(deserializer)?;
 
         let pieces: Vec<_> = time_string.trim().split_whitespace().collect();
@@ -209,7 +205,7 @@ impl<'de> serde::Deserialize<'de> for Time {
                 u => { return Err(serde::de::Error::custom(format!("Unknown time unit: {u}"))); }
             };
 
-            Ok(Time { value_ns: time * unit })
+            Ok(Time::nanos(time * unit))
         } else {
             return Err(serde::de::Error::custom("Parsing error, unknown format"));
         }
@@ -319,6 +315,10 @@ impl Time2 {
 
     pub fn value(&self) -> f64 {
         self.value
+    }
+
+    pub fn sqrt(self) -> Time {
+        Time::nanos(self.value.sqrt())
     }
 }
 

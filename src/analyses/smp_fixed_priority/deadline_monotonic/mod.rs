@@ -16,7 +16,9 @@ pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> Result<bool, E
     AnalysisUtils::assert_ordered_by_deadline(taskset)?;
 
     if num_processors < 2 {
-        return Err(Error::Precondition(format!("Number of processors must be greater of equal to 2")));
+        return Err(Error::Precondition(
+            format!("Number of processors must be greater of equal to 2")
+        ));
     }
 
     let d_tot = RTUtils::total_density(taskset);

@@ -1,7 +1,5 @@
 use crate::prelude::*;
 
-pub mod runner;
-
 /// Liu, C. L., & Layland, J. W. (1973). Scheduling algorithms for
 /// multiprogramming in a hard-real-time environment. Journal of the ACM (JACM),
 /// 20(1), 46-61.
@@ -18,7 +16,8 @@ pub fn is_schedulable(taskset: &[RTTask]) -> Result<bool, Error> {
 
     // Theorem 5: let m = #Tasks, lub(Utilization) = m * (2^(1/m) - 1)
     let total_utilization = RTUtils::total_utilization(taskset);
-    let rate_monotonic_lub = (taskset.len() as f64) * (2f64.powf(1f64 / taskset.len() as f64) - 1f64);
+    let rate_monotonic_lub =
+        (taskset.len() as f64) * (f64::powf(2.0, 1.0 / taskset.len() as f64) - 1.0);
 
     Ok(total_utilization <= rate_monotonic_lub)
 }

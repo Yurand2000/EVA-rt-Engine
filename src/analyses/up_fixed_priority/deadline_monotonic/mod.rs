@@ -49,7 +49,7 @@ pub fn is_schedulable(taskset: &[RTTask]) -> Result<bool, Error> {
 
         tasksubset.iter()
             .take(tasksubset.len() - 1)
-            .map(|task| (task.deadline / last_task.period).ceil() * last_task.wcet )
+            .map(|task| (task.deadline / last_task.period).ceil() * last_task.wcet)
             .sum()
     }
 

@@ -8,8 +8,7 @@ pub mod prelude {
     };
 }
 
-#[derive(Debug)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 #[derive(PartialEq, Eq)]
 #[derive(clap::ValueEnum)]
 pub enum TasksetFileType {
@@ -25,7 +24,10 @@ pub enum TasksetParseError {
     PlainParseError(String),
 }
 
-pub fn parse_taskset(taskset: &str, typ: TasksetFileType) -> Result<Vec<RTTask>, TasksetParseError> {
+pub fn parse_taskset(
+    taskset: &str,
+    typ: TasksetFileType
+) -> Result<Vec<RTTask>, TasksetParseError> {
     use TasksetFileType::*;
 
     let taskset = std::path::Path::new(taskset);
@@ -38,7 +40,9 @@ pub fn parse_taskset(taskset: &str, typ: TasksetFileType) -> Result<Vec<RTTask>,
             } else {
                 TasksetFileType::Plain
             }
-        } else { typ };
+        } else {
+            typ
+        };
 
     let taskset_data = std::fs::read_to_string(taskset)?;
 
@@ -65,18 +69,26 @@ fn plain_deserialize_task(data: &str) -> Result<RTTask, TasksetParseError> {
         .collect();
 
     if fields.len() != 3 {
-        return Err(TasksetParseError::PlainParseError(format!("RTTask parsing requires three numeric fields (wcet, deadline and period)")));
+        return Err(TasksetParseError::PlainParseError(
+            format!("RTTask parsing requires three numeric fields (wcet, deadline and period)")
+        ));
     }
 
     Ok(RTTask {
         wcet: Time::millis(fields[0].parse()
-            .map_err(|err| TasksetParseError::PlainParseError(format!("Failed to parse field 'wcet': {err}")))?
+            .map_err(|err| TasksetParseError::PlainParseError(
+                format!("Failed to parse field 'wcet': {err}")
+            ))?
         ),
         deadline: Time::millis(fields[1].parse()
-            .map_err(|err| TasksetParseError::PlainParseError(format!("Failed to parse field 'deadline': {err}")))?
+            .map_err(|err| TasksetParseError::PlainParseError(
+                format!("Failed to parse field 'deadline': {err}")
+            ))?
         ),
         period: Time::millis(fields[2].parse()
-            .map_err(|err| TasksetParseError::PlainParseError(format!("Failed to parse field 'period': {err}")))?
+            .map_err(|err| TasksetParseError::PlainParseError(
+                format!("Failed to parse field 'period': {err}")
+            ))?
         ),
     })
 }

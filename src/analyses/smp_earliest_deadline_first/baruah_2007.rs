@@ -9,15 +9,15 @@ use crate::prelude::*;
 /// - Sporadic tasks.
 /// - Constrained deadlines.
 ///
-/// **Worst-Case Complexity:** Pseudo-Polynomial *O(n \* m)* where *n* is the number of
-/// tasks and *m* is the number of processors.
+/// **Worst-Case Complexity:** Pseudo-Polynomial *O(n \* m)* where *n* is the
+/// number of tasks and *m* is the number of processors.
 pub fn baruah_test(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
     // As in [1]: It can also be shown that Condition 8 need only be tested at
-    // those values of Ak at which DBF(tak_i, Ak + Dk) (and DBF') changes for
-    // some task_i.
+    // those values of Ak at which DBF(tak_i, Ak
+    // + Dk) (and DBF') changes for some task_i.
     //
     // Both functions change their output value on a periodic pattern: let C <=
     // D <= T, for task i where to compute the DBFs. The values change in the
@@ -56,20 +56,27 @@ pub fn baruah_test_simple(taskset: &[RTTask], num_processors: u64) -> Result<boo
 
 // Section 5, Theorem 2, Equation 8 [1]
 fn baruah_test_single(taskset: &[RTTask], k: usize, task_k: &RTTask, arrival_k: Time, num_processors: u64) -> bool {
+
     let interferences_1: Vec<_> = taskset.iter().enumerate()
-        .map(|(i, task_i)| interference_1(i, task_i, k, task_k, arrival_k)).collect();
+        .map(|(i, task_i)| interference_1(i, task_i, k, task_k, arrival_k))
+        .collect();
+
     let mut interferences_diff: Vec<_> = taskset.iter().enumerate()
         .zip(interferences_1.iter())
-        .map(|((i, task_i), i1)| interference_2(i, task_i, k, task_k, arrival_k) - *i1).collect();
+        .map(|((i, task_i), i1)| interference_2(i, task_i, k, task_k, arrival_k) - *i1)
+        .collect();
     interferences_diff.sort_unstable();
 
-    interferences_1.into_iter().sum::<Time>() + interferences_diff.into_iter().rev().take((num_processors - 1) as usize).sum::<Time>()
-        <= num_processors as f64 * (arrival_k + task_k.deadline - task_k.wcet)
+    let i1_sum = interferences_1.into_iter().sum::<Time>();
+    let idiff_sum = interferences_diff.into_iter()
+        .rev().take((num_processors - 1) as usize).sum::<Time>();
+
+    i1_sum + idiff_sum <= num_processors as f64 * (arrival_k + task_k.deadline - task_k.wcet)
 }
 
 // Section 2 [1]
 fn demand_bound_function(task: &RTTask, interval: Time) -> Time {
-    Time::max(Time::zero(), ((interval - task.deadline) / task.period).floor() * task.wcet + task.wcet)
+    Time::max(Time::zero(), (((interval - task.deadline) / task.period).floor() + 1.0) * task.wcet)
 }
 
 // Section 6, Equation 3 [1]

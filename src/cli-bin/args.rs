@@ -52,8 +52,8 @@ pub struct SchedulerSpecification {
     pub config_file: Option<String>,
 }
 
-#[derive(Clone)]
-#[derive(clap::ValueEnum, Debug)]
+#[derive(Debug, Clone)]
+#[derive(clap::ValueEnum)]
 #[derive(serde::Deserialize)]
 pub enum SchedulingAlgorithm {
     UpEDF,

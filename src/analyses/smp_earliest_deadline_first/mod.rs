@@ -93,7 +93,19 @@ pub fn bcl_edf(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
 
     #[inline(always)]
     fn beta(task_i: &RTTask, task_k: &RTTask) -> f64 {
-        (num_jobs(task_i, task_k) * task_i.wcet + Time::min(task_i.wcet, (task_k.deadline - num_jobs(task_i, task_k) * task_i.period).positive_or_zero())) / task_k.deadline
+        let n_jobs = num_jobs(task_i, task_k);
+
+        (
+            n_jobs * task_i.wcet
+                +
+            Time::min(
+                task_i.wcet,
+                Time::max(
+                    Time::zero(),
+                    task_k.deadline - n_jobs * task_i.period
+                )
+            )
+        ) / task_k.deadline
     }
 
     Ok(taskset.iter().enumerate()

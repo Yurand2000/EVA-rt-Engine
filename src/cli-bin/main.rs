@@ -5,9 +5,9 @@ pub mod prelude {
     pub use super::taskset_serde::prelude::*;
 }
 
+pub mod analyses;
 pub mod args;
 pub mod taskset_serde;
-pub mod analyses;
 
 fn main() {
     let args = match <Args as clap::Parser>::try_parse() {
@@ -54,11 +54,16 @@ fn check_args(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         args.scheduler_specification.config_file.is_some()
     ) {
         (true, true, false) | (false, false, true) => Ok(()),
-        _ => Err(format!("Either specify an Algorithm and the # of CPUs or a config file (run with -h for help)").into())
+        _ => Err(format!(
+            "Either specify an Algorithm and the # of CPUs or a config file (run with -h for help)"
+        ).into())
     }
 }
 
-fn check_analysis_args(algorithm: &SchedulingAlgorithm, num_cpus: u64) -> Result<(), Box<dyn std::error::Error>> {
+fn check_analysis_args(
+    algorithm: &SchedulingAlgorithm,
+    num_cpus: u64
+) -> Result<(), Box<dyn std::error::Error>> {
     use SchedulingAlgorithm::*;
 
     if num_cpus == 0 {
@@ -83,32 +88,41 @@ struct SchedulerSpecification {
 fn main_wo_exit_code(args: Args) -> Result<bool, Box<dyn std::error::Error>> {
     use SchedulingAlgorithm::*;
 
-    let taskset = parse_taskset(&args.taskset_args.taskset_file, args.taskset_args.taskset_file_ty)?;
+    let taskset = parse_taskset(
+        &args.taskset_args.taskset_file,
+        args.taskset_args.taskset_file_ty
+    )?;
 
     let scheduler: SchedulerSpecification =
-        args.scheduler_specification.algorithm.and_then(|algo| -> Option<Result<_, Box<dyn std::error::Error>>> {
-            Some( Ok(SchedulerSpecification {
-                algorithm: algo,
-                num_processors: args.scheduler_specification.num_processors.unwrap(),
-                specific_test: args.scheduler_specification.specific_test,
-            } ))
-        }).unwrap_or_else(|| {
-            std::fs::read_to_string(args.scheduler_specification.config_file.unwrap())
-                .map_err(|err| format!("Config parse error: {err}").into())
-                .and_then(|config_data| {
-                    serde_json::from_str(&config_data)
-                        .map_err(|err| format!("Config parse error: {err}").into())
-                })
-        })?;
+        args.scheduler_specification.algorithm
+            .and_then(|algo| -> Option<Result<_, Box<dyn std::error::Error>>> {
+                Some( Ok(SchedulerSpecification {
+                    algorithm: algo,
+                    num_processors: args.scheduler_specification.num_processors.unwrap(),
+                    specific_test: args.scheduler_specification.specific_test,
+                } ))
+            })
+            .unwrap_or_else(|| {
+                std::fs::read_to_string(args.scheduler_specification.config_file.unwrap())
+                    .map_err(|err| format!("Config parse error: {err}").into())
+                    .and_then(|config_data| {
+                        serde_json::from_str(&config_data)
+                            .map_err(|err| format!("Config parse error: {err}").into())
+                    })
+            })?;
 
     check_analysis_args(&scheduler.algorithm, scheduler.num_processors)?;
 
     let single_test = scheduler.specific_test.as_deref();
     let num_cpus = scheduler.num_processors;
     match scheduler.algorithm {
-        UpEDF => analyses::uniprocessor_edf(&taskset, single_test, args.quiet),
-        UpFP => analyses::uniprocessor_fp(&taskset, single_test, args.quiet),
-        GlobalEDF => analyses::global_earliest_deadline_first(&taskset, num_cpus, single_test, args.quiet),
-        GlobalFP => analyses::global_fixed_priority(&taskset, num_cpus, single_test, args.quiet),
+        UpEDF =>
+            analyses::uniprocessor_edf(&taskset, single_test, args.quiet),
+        UpFP =>
+            analyses::uniprocessor_fp(&taskset, single_test, args.quiet),
+        GlobalEDF =>
+            analyses::global_earliest_deadline_first(&taskset, num_cpus, single_test, args.quiet),
+        GlobalFP =>
+            analyses::global_fixed_priority(&taskset, num_cpus, single_test, args.quiet),
     }
 }
