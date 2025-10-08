@@ -94,6 +94,36 @@ pub fn generate_interface_global_dm_simple(taskset: &[RTTask], period: Time) -> 
     )
 }
 
+pub fn generate_interface_global_dm2_simple(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
+    AnalysisUtils::assert_constrained_deadlines(taskset)?;
+    AnalysisUtils::assert_ordered_by_deadline(taskset)?;
+    AnalysisUtils::assert_integer_times(taskset)?;
+
+    generic::generate_interface(
+        taskset,
+        period,
+        generic::GenerationStrategy::Naive,
+        num_processors_lower_bound, // ?
+        num_processors_upper_bound, // ?
+        |taskset, model| {
+            let min_feasible_resource = (model.period * (model.concurrency as f64 - 1.0)).as_nanos() as usize;
+            let max_feasible_resource = (model.period * model.concurrency as f64).as_nanos() as usize;
+
+            (min_feasible_resource ..= max_feasible_resource)
+                .map(|resource| Time::nanos(resource as f64))
+                .filter(|resource|
+                    is_schedulable_dm_simple(taskset, &(*resource, model.clone()).into()).unwrap_or(false)
+                )
+                .next()
+                .ok_or_else(|| Error::Generic(format!(
+                    "Cannot schedule taskset with period {}ns and {} CPUS",
+                    model.period.as_nanos(),
+                    model.concurrency,
+                )))
+        }
+    )
+}
+
 fn demand_dm(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
     global_deadline_monotonic_demand(taskset, k, task_k)
         +

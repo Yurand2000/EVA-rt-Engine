@@ -4,6 +4,7 @@ pub mod bcl_2009;
 pub mod generic;
 
 // Section 3.2 [1]
+#[derive(Debug, Clone)]
 pub struct MPRModel {
     pub resource: Time,
     pub period: Time,

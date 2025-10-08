@@ -1,5 +1,6 @@
 pub mod prelude {
     pub use super::binary_search::prelude::*;
+    pub use super::taskset_serde::prelude::*;
     pub use super::{
         Time,
         Time2,
@@ -9,6 +10,7 @@ pub mod prelude {
 }
 
 pub mod binary_search;
+pub mod taskset_serde;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Time {
@@ -250,11 +252,11 @@ impl RTTask {
 
 impl RTUtils {
     pub fn is_taskset_sorted_by_period(taskset: &[RTTask]) -> bool {
-        taskset.windows(2).all(|w| w[0].period < w[1].period)
+        taskset.windows(2).all(|w| w[0].period <= w[1].period)
     }
 
     pub fn is_taskset_sorted_by_deadline(taskset: &[RTTask]) -> bool {
-        taskset.windows(2).all(|w| w[0].deadline < w[1].deadline)
+        taskset.windows(2).all(|w| w[0].deadline <= w[1].deadline)
     }
 
     pub fn implicit_deadlines(taskset: &[RTTask]) -> bool {
