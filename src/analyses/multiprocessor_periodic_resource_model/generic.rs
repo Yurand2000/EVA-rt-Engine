@@ -46,8 +46,8 @@ pub enum GenerationStrategy {
 
 #[derive(Debug, Clone)]
 pub struct MPRModelSpecification {
-    period: Time,
-    concurrency: u64,
+    pub period: Time,
+    pub concurrency: u64,
 }
 
 pub fn generate_interface<FProcLB, FProcUB, FResource>(

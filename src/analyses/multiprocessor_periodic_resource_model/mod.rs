@@ -81,72 +81,64 @@ pub fn is_schedulable_edf_simple(taskset: &[RTTask], model: &MPRModel) -> Result
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
-    taskset.iter().enumerate().fold(Ok(true), |all, (k, task_k)| {
-        match all {
-            Ok(false) | Err(_) => { return all; },
-            _ => (),
-        };
-
-        let ak_upperbound = arrival_k_upperbound_edf(taskset, task_k, model)?.ceil();
-
-        // naive implementation
-        Ok((0 ..= ak_upperbound.ceil().as_nanos() as usize)
-            .map(|arrival_k| Time::nanos(arrival_k as f64))
-            .all(|arrival_k| {
-                demand_edf(taskset, k, task_k, model.concurrency, arrival_k)
-                    <=
-                sbf(model, arrival_k + task_k.deadline)
-            }))
-    })
+    generic::is_schedulable(
+        taskset,
+        model,
+        |taskset, k, task_k, model, arrival_k|
+            demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
+        |taskset, _, task_k, model|
+            arrival_k_upperbound_edf(taskset, task_k, model),
+        |_, _, _, _, _| true,
+    )
 }
 
 pub fn is_schedulable_edf(taskset: &[RTTask], model: &MPRModel) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
-    taskset.iter().enumerate().fold(Ok(true), |all, (k, task_k)| {
-        match all {
-            Ok(false) | Err(_) => { return all; },
-            _ => (),
-        };
+    generic::is_schedulable(
+        taskset,
+        model,
+        |taskset, k, task_k, model, arrival_k|
+            demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
+        |taskset, _, task_k, model|
+            arrival_k_upperbound_edf(taskset, task_k, model),
+        |taskset, _, task_k, model, arrival_k|
+            filter_intervals_edf(taskset, task_k, model, arrival_k),
+    )
+}
 
-        let ak_upperbound = arrival_k_upperbound_edf(taskset, task_k, model)?.ceil();
+fn filter_intervals_edf(
+    taskset: &[RTTask],
+    task_k: &RTTask,
+    model: &MPRModel,
+    arrival_k: Time
+) -> bool {
+    // It is also easy to show that Equation (5) only needs to be evaluated at
+    // those values of Ak for which at least one  of I_hat, I_flat, or sbf
+    // change. [1]
+    //
+    // Both functions I_hat and I_flat change their value based on Wi and CIi,
+    // on a periodic basis: their values are the same every interval of the form
+    // [D_i + aT_i, D_i + T_I + aT_i] for all a >= 0. The I_hat function also
+    // changes in the interval [0, C_i]. While the linear supply bound function
+    // changes at every interval, the non-linear sbf is constant for values in
+    // the range [-floor(Theta/m) + a*Pi, Pi - 2floor(Theta/m) + a*Pi] for all a
+    // >= 0.
+    let interval = arrival_k + task_k.deadline;
 
-        // It is also easy to show that Equation (5) only needs to be evaluated
-        // at those values of Ak for which at least one  of I_hat, I_flat, or
-        // sbf change. [1]
-        //
-        // Both functions I_hat and I_flat change their value based on Wi and
-        // CIi, on a periodic basis: their values are the same every interval of
-        // the form [D_i + aT_i, D_i + T_I + aT_i] for all a >= 0. The I_hat
-        // function also changes in the interval [0, C_i].
-        // While the linear supply bound function changes at every interval, the
-        // non-linear sbf is constant for values in the range [-floor(Theta/m) +
-        // a*Pi, Pi - 2floor(Theta/m) + a*Pi] for all a >= 0.
-        Ok((0 ..= ak_upperbound.ceil().as_nanos() as usize)
-            .map(|arrival_k| Time::nanos(arrival_k as f64))
-            .filter(|arrival_k| {
-                let interval = *arrival_k + task_k.deadline;
+    // Perform the test only where SBF changes
+    let floor = (model.resource / model.concurrency as f64).floor();
+    let modulus = (interval + floor) % model.period;
+    if modulus >= model.period - floor || modulus == Time::zero() {
+        return true;
+    }
 
-                // Perform the test only where SBF changes
-                let floor = (model.resource / model.concurrency as f64).floor();
-                let modulus = (interval + floor) % model.period;
-                if modulus >= model.period - floor || modulus == Time::zero() {
-                    return true;
-                }
+    // Perform the test only where I_hat/I_flat values change.
+    taskset.iter().any(|task_i| {
+        let modulus = arrival_k % task_i.period;
 
-                // Perform the test only where I_hat/I_flat values change.
-                taskset.iter().any(|task_i| {
-                    let modulus = *arrival_k % task_i.period;
-
-                    interval <= task_i.wcet || modulus == Time::zero()
-                })
-            })
-            .all(|arrival_k| {
-                demand_edf(taskset, k, task_k, model.concurrency, arrival_k)
-                    <=
-                sbf(model, arrival_k + task_k.deadline)
-            }))
+        interval <= task_i.wcet || modulus == Time::zero()
     })
 }
 
@@ -229,52 +221,70 @@ pub fn generate_interface_global_edf_simple(taskset: &[RTTask], period: Time) ->
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
-    let Some((resource, concurrency)) =
-        // naive implementation (can do binary search: Section 5.1, Lemma 3 [1])
-        // we can stop as soon as we have a non-None value, as the resource is
-        // monotonically increasing with the number of CPUs.
-        (num_processors_lower_bound(taskset) ..= num_processors_upper_bound(taskset))
-        .fold(None, |acc, concurrency: u64| {
-            if acc.is_some() {
-                acc
-            } else {
-                best_required_resource_edf(taskset, period, concurrency).ok()
-                    .map(|res| (res, concurrency))
-            }
-        })
-    else { panic!("unexpected"); };
-
-    Ok(MPRModel {
-        resource,
+    generic::generate_interface(
+        taskset,
         period,
-        concurrency,
-    })
+        generic::GenerationStrategy::MonotoneLinearSearch,
+        num_processors_lower_bound,
+        num_processors_upper_bound,
+        minimum_required_resource_edf,
+    )
 }
 
 pub fn generate_interface_global_edf(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
-    let concurrency_range =
-        num_processors_lower_bound(taskset) as usize
-            ..=
-        num_processors_upper_bound(taskset) as usize;
-
-    let Some((resource, concurrency)) =
-        // binary search: Section 5.1, Lemma 3 [1]
-        binary_search_fn(
-            concurrency_range,
-            |concurrency| {
-                best_required_resource_edf(taskset, period, concurrency as u64).ok()
-                    .map(|res| (res, concurrency as u64))
-            })
-    else { panic!("unexpected"); };
-
-    Ok(MPRModel {
-        resource,
+    generic::generate_interface(
+        taskset,
         period,
-        concurrency,
-    })
+        generic::GenerationStrategy::MonotoneBinarySearch,
+        num_processors_lower_bound,
+        num_processors_upper_bound,
+        minimum_required_resource_edf,
+    )
+}
+
+fn minimum_required_resource_edf(
+    taskset: &[RTTask],
+    model: &generic::MPRModelSpecification
+) -> Result<Time, Error> {
+    generic::minimum_required_resource(
+        taskset,
+        model,
+        |taskset, k, task_k, model, arrival_k|
+            demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
+
+        // To bound Ak as in Theorem 2 we must know the value of Theta.
+        // However, since Theta is being computed, we use its smallest
+        // (0) and largest (mPi) possible values to bound Ak. [1]
+        |_, _, _, model|
+            Ok(model.concurrency as f64 * model.period),
+
+        // It is also easy to show that Equation (5) only needs to be
+        // evaluated at those values of Ak for which at least one  of
+        // I_hat, I_flat, or sbf change. [1]
+        //
+        // Both functions I_hat and I_flat change their value based on
+        // Wi and CIi, on a periodic basis: their values are the same
+        // every interval of the form [D_i + aT_i, D_i + T_I + aT_i] for
+        // all a >= 0. The I_hat function also changes in the interval
+        // [0, C_i]. The linear supply bound function changes at every
+        // interval, but we can consider only the intervals where I_hat
+        // and I_flat change, as it is a monotone function (i.e., if
+        // it's satisfied between those intervals, it will be also
+        // satisfied outside because of monotonicity).
+        |taskset, _, task_k, _, arrival_k| {
+            let interval = arrival_k + task_k.deadline;
+
+            // Perform the test only where I_hat/I_flat values change.
+            taskset.iter().any(|task_i| {
+                let modulus = arrival_k % task_i.period;
+
+                interval <= task_i.wcet || modulus == Time::zero()
+            })
+        },
+    )
 }
 
 #[inline(always)]
@@ -303,81 +313,6 @@ fn num_processors_upper_bound(taskset: &[RTTask]) -> u64 {
         .sum();
 
     (total_work / den).ceil() as u64 + n
-}
-
-pub fn best_required_resource_edf(taskset: &[RTTask], period: Time, concurrency: u64) -> Result<Time, Error> {
-    let max_feasible_resource = period * concurrency as f64;
-
-    taskset.iter().enumerate().fold(Ok(Time::zero()), |acc, (k, task_k)| {
-        if acc.is_err() {
-            return acc;
-        }
-
-        // To bound Ak as in Theorem 2 we must know the value of Theta. However,
-        // since Theta is being computed, we use its smallest (0) and largest
-        // (mPi) possible values to bound Ak. [1]
-        let ak_upperbound = concurrency as f64 * period;
-
-        // It is also easy to show that Equation (5) only needs to be evaluated
-        // at those values of Ak for which at least one  of I_hat, I_flat, or
-        // sbf change. [1]
-        //
-        // Both functions I_hat and I_flat change their value based on Wi and
-        // CIi, on a periodic basis: their values are the same every interval of
-        // the form [D_i + aT_i, D_i + T_I + aT_i] for all a >= 0. The I_hat
-        // function also changes in the interval [0, C_i]. The linear supply
-        // bound function changes at every interval, but we can consider only
-        // the intervals where I_hat and I_flat change, as it is a monotone
-        // function (i.e., if it's satisfied between those intervals, it will be
-        // also satisfied outside because of monotonicity).
-        let best_resource_k =
-            (0 ..= ak_upperbound.ceil().as_nanos() as usize)
-            .map(|arrival_k| Time::nanos(arrival_k as f64))
-            .filter(|arrival_k| {
-                let interval = *arrival_k + task_k.deadline;
-
-                // Perform the test only where I_hat/I_flat values change.
-                taskset.iter().any(|task_i| {
-                    let modulus = *arrival_k % task_i.period;
-
-                    interval <= task_i.wcet || modulus == Time::zero()
-                })
-            })
-            .fold(Ok(Time::zero()), |acc, arrival_k| {
-                if acc.is_err() {
-                    return acc;
-                }
-
-                let interval = arrival_k + task_k.deadline;
-                let demand = demand_edf(taskset, k, task_k, concurrency, arrival_k);
-
-                // For each  value of number of processors m, we compute the
-                // smallest value of Theta that satisfies Equation (5) in
-                // Theorem 1. However, Theta appears inside floor and ceiling
-                // functions in sbf, and hence these computations may be
-                // intractable. Therefore, we replace sbf in this equation with
-                // lsbf given in Equation (2). [1]
-                let resource_at_arrival_k =
-                    resource_from_linear_sbf(demand, interval, period, concurrency);
-
-                if resource_at_arrival_k > max_feasible_resource {
-                    Err(Error::Generic(format!(
-                        "Cannot schedule taskset with period {}ns and {concurrency} CPUS",
-                        period.as_nanos()
-                    )))
-                } else {
-                    Ok(Time::max(
-                        acc.unwrap(),
-                        resource_at_arrival_k
-                    ))
-                }
-            })?;
-
-        Ok(Time::max(
-            acc.unwrap(),
-            best_resource_k
-        ))
-    })
 }
 
 // Equation 3 [1]
