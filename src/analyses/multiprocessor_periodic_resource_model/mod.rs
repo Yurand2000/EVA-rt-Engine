@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 pub mod bcl_2009;
+pub mod generic;
 
 // Section 3.2 [1]
 pub struct MPRModel {
@@ -23,7 +24,7 @@ impl MPRModel {
 }
 
 // Equation 1 [1]
-pub fn supply_bound_function(model: &MPRModel, time: Time) -> Time {
+pub fn sbf(model: &MPRModel, time: Time) -> Time {
     #[inline(always)]
     fn k(model: &MPRModel, time: Time) -> f64 {
         (
@@ -53,14 +54,14 @@ pub fn supply_bound_function(model: &MPRModel, time: Time) -> Time {
 }
 
 // Equation 2 [1]
-pub fn linear_supply_bound_function(model: &MPRModel, interval: Time) -> Time {
+pub fn linear_sbf(model: &MPRModel, interval: Time) -> Time {
     let (resource, period, concurrency) = (model.resource, model.period, model.concurrency);
 
     resource * (interval - 2.0 * (period - resource / concurrency as f64)) / period
 }
 
 // Extracted Theta from Equation 2 [1]
-pub fn resource_from_linear_supply_bound(lsbf: Time, interval: Time, period: Time, concurrency: u64) -> Time {
+pub fn resource_from_linear_sbf(lsbf: Time, interval: Time, period: Time, concurrency: u64) -> Time {
     // Note that this only works for positive values of the linear supply bound.
     // There is only one positive solution for a positive bound, but two
     // solutions or zero for a negative one.
@@ -94,7 +95,7 @@ pub fn is_schedulable_edf_simple(taskset: &[RTTask], model: &MPRModel) -> Result
             .all(|arrival_k| {
                 demand_edf(taskset, k, task_k, model.concurrency, arrival_k)
                     <=
-                supply_bound_function(model, arrival_k + task_k.deadline)
+                sbf(model, arrival_k + task_k.deadline)
             }))
     })
 }
@@ -144,7 +145,7 @@ pub fn is_schedulable_edf(taskset: &[RTTask], model: &MPRModel) -> Result<bool, 
             .all(|arrival_k| {
                 demand_edf(taskset, k, task_k, model.concurrency, arrival_k)
                     <=
-                supply_bound_function(model, arrival_k + task_k.deadline)
+                sbf(model, arrival_k + task_k.deadline)
             }))
     })
 }
@@ -357,7 +358,7 @@ pub fn best_required_resource_edf(taskset: &[RTTask], period: Time, concurrency:
                 // intractable. Therefore, we replace sbf in this equation with
                 // lsbf given in Equation (2). [1]
                 let resource_at_arrival_k =
-                    resource_from_linear_supply_bound(demand, interval, period, concurrency);
+                    resource_from_linear_sbf(demand, interval, period, concurrency);
 
                 if resource_at_arrival_k > max_feasible_resource {
                     Err(Error::Generic(format!(
@@ -468,7 +469,7 @@ fn test_lsbf() {
             continue;
         }
 
-        let lsbf = linear_supply_bound_function(
+        let lsbf = linear_sbf(
             &MPRModel { resource, period, concurrency },
             interval
         );
@@ -478,7 +479,7 @@ fn test_lsbf() {
             continue;
         }
 
-        let inverse = resource_from_linear_supply_bound(lsbf, interval, period, concurrency);
+        let inverse = resource_from_linear_sbf(lsbf, interval, period, concurrency);
         assert_eq!(resource, inverse);
     }}}}
 }

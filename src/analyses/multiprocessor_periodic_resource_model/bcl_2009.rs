@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use super::{
     MPRModel,
-    supply_bound_function
+    sbf
 };
 
 // demands for deadline monotonic and earliest deadline first, from [1]
@@ -67,7 +67,7 @@ fn is_schedulable_simple<F>(taskset: &[RTTask], demand_fn: F, model: &MPRModel) 
     Ok(taskset.iter().enumerate().all(|(k, task_k)| {
         demand_fn(taskset, k, task_k, model.concurrency)
             <=
-        supply_bound_function(model, task_k.deadline)
+        sbf(model, task_k.deadline)
     }))
 }
 
@@ -109,7 +109,7 @@ fn best_required_resource<F>(taskset: &[RTTask], demand_fn: F, period: Time, con
 
         let demand = demand_fn(taskset, k, task_k, concurrency);
         let resource_at_arrival_k =
-            super::resource_from_linear_supply_bound(demand, task_k.deadline, period, concurrency);
+            super::resource_from_linear_sbf(demand, task_k.deadline, period, concurrency);
 
         if resource_at_arrival_k > max_feasible_resource {
             Err(Error::Generic(format!(
