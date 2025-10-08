@@ -2,24 +2,27 @@ use crate::prelude::*;
 
 // Theorem 6 [1]
 // Section 4 Equation 7
-pub fn bcl_generic_work_conserving(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
+pub fn ibcl_generic_work_conserving(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
     Ok(taskset.iter().enumerate()
         .all(|(k, task_k)| {
-            let ub: Time =
-                taskset.iter().enumerate()
-                .filter(|(i, _)| *i != k)
-                .map(|(_, task_i)| {
-                    Time::min(
-                        workload_upperbound(task_k.deadline, task_i),
-                        task_k.laxity() + Time::one(),
-                    )
-                })
-                .sum();
-
-            ub < num_processors as f64 * (task_k.laxity() + Time::one())
+            work_conserving_demand(taskset, k, task_k)
+                <=
+            num_processors as f64 * (task_k.laxity() + Time::one())
         }))
+}
+
+pub fn work_conserving_demand(taskset: &[RTTask], k: usize, task_k: &RTTask) -> Time {
+    taskset.iter().enumerate()
+        .filter(|(i, _)| *i != k)
+        .map(|(_, task_i)| {
+            Time::min(
+                workload_upperbound(task_k.deadline, task_i),
+                task_k.laxity() + Time::one(),
+            )
+        })
+        .sum()
 }
 
 // Theorem 7 [1]
@@ -97,21 +100,6 @@ fn interference_edf_upperbound(by_task: &RTTask, to_task: &RTTask) -> Time {
     Time::min(task_i.wcet, task_k.deadline - (task_k.deadline / task_i.period) * task_i.period)
 }
 
-fn slack_lb(taskset: &[RTTask], task_k: &RTTask, num_processors: i64) -> Time {
-    let k = 0;
-
-    let lb: Time =
-        taskset.iter().enumerate()
-        .filter(|(i, _)| *i != k)
-        .map(|(_, task_i)| {
-            let workload = workload_upperbound(task_k.deadline, task_i);
-            Time::min(workload, task_k.laxity() + Time::one())
-        })
-        .sum();
-
-    task_k.laxity() - lb / num_processors as f64
-}
-
 #[test]
 // Example 1 [1]
 fn example_1() {
@@ -135,12 +123,10 @@ fn example_2() {
         RTTask::new_ns(1, 10, 10),
     ];
 
-    let num_processors = 2;
-
     assert_eq!(workload_upperbound(taskset[1].deadline, &taskset[0]), Time::nanos(10.0));
     assert_eq!(workload_upperbound(taskset[0].deadline, &taskset[1]), Time::nanos(1.0));
     // it should fail, as says in the paper, but it doesn't. Numbers seem ok
-    // assert!(!is_schedulable_generic_work_conserving(&taskset, num_processors).unwrap());
+    // assert!(!ibcl_generic_work_conserving(&taskset, 2).unwrap());
 }
 
 /* -----------------------------------------------------------------------------
