@@ -50,18 +50,18 @@ pub fn global_earliest_deadline_first_demand(taskset: &[RTTask], k: usize, task_
         .sum()
 }
 
-pub fn ibcl_dm(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
+pub fn ibcl_fp(taskset: &[RTTask], num_processors: u64) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
 
     Ok(taskset.iter().enumerate()
         .all(|(k, task_k)|
-            global_deadline_monotonic_demand(taskset, k, task_k)
+            global_fixed_priority_demand(taskset, k, task_k)
                 <
             num_processors as f64 * (task_k.laxity() + Time::one())
         ))
 }
 
-pub fn global_deadline_monotonic_demand(taskset: &[RTTask], k: usize, task_k: &RTTask) -> Time {
+pub fn global_fixed_priority_demand(taskset: &[RTTask], k: usize, task_k: &RTTask) -> Time {
     taskset.iter()
         .enumerate()
         .filter(|(i, _)| *i < k)

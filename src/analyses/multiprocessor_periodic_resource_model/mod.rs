@@ -54,6 +54,20 @@ pub fn sbf(model: &MPRModel, time: Time) -> Time {
     }
 }
 
+pub fn resource_from_sbf(sbf_v: Time, interval: Time, period: Time, concurrency: u64) -> Time {
+    exp_search( 0.. , |resource| {
+        let model = MPRModel {
+            resource: Time::nanos(resource as f64),
+            period: period,
+            concurrency: concurrency,
+        };
+
+        sbf(&model, interval)
+    }, sbf_v)
+        .map(|resource| Time::nanos(resource as f64))
+        .unwrap_or(Time::zero())
+}
+
 // Equation 2 [1]
 pub fn linear_sbf(model: &MPRModel, interval: Time) -> Time {
     let (resource, period, concurrency) = (model.resource, model.period, model.concurrency);

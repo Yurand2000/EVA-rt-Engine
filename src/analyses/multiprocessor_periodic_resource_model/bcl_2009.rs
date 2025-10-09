@@ -9,7 +9,7 @@ use super::{
 // demands for deadline monotonic and earliest deadline first, from [1]
 use crate::analyses::smp_earliest_deadline_first::bcl_2009::{
     global_earliest_deadline_first_demand,
-    global_deadline_monotonic_demand,
+    global_fixed_priority_demand,
 };
 
 // Earliest Deadline First cluster-scheduling (using [1]) for MPR --------------
@@ -55,23 +55,22 @@ fn demand_edf(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -
     concurrency as f64 * task_k.wcet
 }
 
-// Deadline Monotonic cluster-scheduling (using [1]) for MPR -------------------
-pub fn is_schedulable_dm_simple(taskset: &[RTTask], model: &MPRModel) -> Result<bool, Error> {
+// Fixed Priority cluster-scheduling (using [1]) for MPR -------------------
+pub fn is_schedulable_fp_simple(taskset: &[RTTask], model: &MPRModel) -> Result<bool, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
-    AnalysisUtils::assert_ordered_by_deadline(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
     generic::is_schedulable(
         taskset,
         model,
         |taskset, k, task_k, model, _|
-            demand_dm(taskset, k, task_k, model.concurrency),
+            demand_fp(taskset, k, task_k, model.concurrency),
         |_, _, _, _| Ok(Time::zero()),
         |_, _, _, _, _| true,
     )
 }
 
-pub fn generate_interface_global_dm_simple(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
+pub fn generate_interface_global_fp_simple(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_ordered_by_deadline(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
@@ -87,14 +86,14 @@ pub fn generate_interface_global_dm_simple(taskset: &[RTTask], period: Time) -> 
                 taskset,
                 model,
                 |taskset, k, task_k, model, _|
-                    demand_dm(taskset, k, task_k, model.concurrency),
+                    demand_fp(taskset, k, task_k, model.concurrency),
                 |_, _, _, _| Ok(Time::zero()),
                 |_, _, _, _, _| true,
             ),
     )
 }
 
-pub fn generate_interface_global_dm2_simple(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
+pub fn generate_interface_global_fp2_simple(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_ordered_by_deadline(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
@@ -106,13 +105,13 @@ pub fn generate_interface_global_dm2_simple(taskset: &[RTTask], period: Time) ->
         num_processors_lower_bound, // ?
         num_processors_upper_bound, // ?
         |taskset, model| {
-            let min_feasible_resource = (model.period * (model.concurrency as f64 - 1.0)).as_nanos() as usize;
+            let min_feasible_resource = taskset.iter().map(|task| task.wcet).sum::<Time>().as_nanos() as usize;
             let max_feasible_resource = (model.period * model.concurrency as f64).as_nanos() as usize;
 
             (min_feasible_resource ..= max_feasible_resource)
                 .map(|resource| Time::nanos(resource as f64))
                 .filter(|resource|
-                    is_schedulable_dm_simple(taskset, &(*resource, model.clone()).into()).unwrap_or(false)
+                    is_schedulable_fp_simple(taskset, &(*resource, model.clone()).into()).unwrap_or(false)
                 )
                 .next()
                 .ok_or_else(|| Error::Generic(format!(
@@ -124,8 +123,8 @@ pub fn generate_interface_global_dm2_simple(taskset: &[RTTask], period: Time) ->
     )
 }
 
-fn demand_dm(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
-    global_deadline_monotonic_demand(taskset, k, task_k)
+fn demand_fp(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
+    global_fixed_priority_demand(taskset, k, task_k)
         +
     concurrency as f64 * task_k.wcet
 }

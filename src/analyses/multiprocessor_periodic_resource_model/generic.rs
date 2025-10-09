@@ -3,7 +3,7 @@ use crate::prelude::*;
 use super::{
     MPRModel,
     sbf,
-    resource_from_linear_sbf,
+    resource_from_sbf,
 };
 
 pub fn is_schedulable<FDem, FUb, FFilter>(
@@ -151,7 +151,7 @@ pub fn minimum_required_resource<FDem, FUb, FFilter>(
                 let demand = demand_fn(taskset, k, task_k, model, arrival_k);
 
                 let resource_at_arrival_k =
-                    resource_from_linear_sbf(demand, interval, model.period, model.concurrency);
+                    resource_from_sbf(demand, interval, model.period, model.concurrency);
 
                 if resource_at_arrival_k > max_feasible_resource {
                     Err(Error::Generic(format!(

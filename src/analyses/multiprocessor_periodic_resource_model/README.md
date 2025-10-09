@@ -26,7 +26,7 @@
 
     Worst-Case Complexity: *O(n^2)*
 
-- **Global DM - Bertogna, Cirinei, Lipari demand** (2008) [^2]
+- **Global FP - Bertogna, Cirinei, Lipari demand** (2008) [^2]
 
     *same framework from Shin et al, buth with Bertogna et al __adapted__ demand function*
 
@@ -42,7 +42,7 @@
 
 - **Global EDF - Shin, Easwaran, Lee** (2008) [^1]
 - **Global EDF - Bertogna, Cirinei, Lipari demand** (2008) [^2]
-- **Global DM - Bertogna, Cirinei, Lipari demand** (2008) [^2]
+- **Global FP - Bertogna, Cirinei, Lipari demand** (2008) [^2]
 
 ### 📚 References
 
