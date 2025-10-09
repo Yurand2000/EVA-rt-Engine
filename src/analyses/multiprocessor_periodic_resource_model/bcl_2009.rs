@@ -72,7 +72,6 @@ pub fn is_schedulable_fp_simple(taskset: &[RTTask], model: &MPRModel) -> Result<
 
 pub fn generate_interface_global_fp_simple(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
-    AnalysisUtils::assert_ordered_by_deadline(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
     generic::generate_interface(
@@ -95,7 +94,6 @@ pub fn generate_interface_global_fp_simple(taskset: &[RTTask], period: Time) -> 
 
 pub fn generate_interface_global_fp2_simple(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
-    AnalysisUtils::assert_ordered_by_deadline(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
     generic::generate_interface(
@@ -105,10 +103,10 @@ pub fn generate_interface_global_fp2_simple(taskset: &[RTTask], period: Time) ->
         num_processors_lower_bound, // ?
         num_processors_upper_bound, // ?
         |taskset, model| {
-            let min_feasible_resource = taskset.iter().map(|task| task.wcet).sum::<Time>().as_nanos() as usize;
+            let min_feasible_resource = (RTUtils::total_utilization(taskset) * model.period).floor().as_nanos() as usize;
             let max_feasible_resource = (model.period * model.concurrency as f64).as_nanos() as usize;
 
-            (min_feasible_resource ..= max_feasible_resource)
+            (min_feasible_resource ..= max_feasible_resource).step_by(100)
                 .map(|resource| Time::nanos(resource as f64))
                 .filter(|resource|
                     is_schedulable_fp_simple(taskset, &(*resource, model.clone()).into()).unwrap_or(false)

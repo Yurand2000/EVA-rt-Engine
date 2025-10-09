@@ -22,7 +22,6 @@ fn main() {
     let model =
         eva_engine::analyses::multiprocessor_periodic_resource_model::bcl_2009::
             generate_interface_global_fp_simple(&taskset, Time::millis(args.period_ms as f64))
-            // generate_interface_global_dm2_simple(&taskset, Time::millis(args.period_ms as f64))
         .unwrap();
 
     println!("{} {:.0} {:.0}",

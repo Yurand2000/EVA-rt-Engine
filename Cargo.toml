@@ -18,5 +18,5 @@ name = "eva-engine-cli"
 path = "src/cli-bin/main.rs"
 
 [[bin]]
-name = "mpr_dm_gen"
-path = "src/bin/mpr_dm_gen.rs"
+name = "mpr_fp_gen"
+path = "src/bin/mpr_fp_gen.rs"
