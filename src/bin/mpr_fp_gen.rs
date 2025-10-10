@@ -9,6 +9,10 @@ pub struct Args {
     /// MPR Period
     #[arg(short='T', value_name="PERIOD ms")]
     pub period_ms: u64,
+
+    /// MPR Period
+    #[arg(short='S', default_value="100", value_name="STEP SIZE ns")]
+    pub step_size_ns: u64
 }
 
 fn main() {
@@ -21,7 +25,7 @@ fn main() {
 
     let model =
         eva_engine::analyses::multiprocessor_periodic_resource_model::bcl_2009::
-            generate_interface_global_fp_simple(&taskset, Time::millis(args.period_ms as f64))
+            generate_interface_global_fp(&taskset, Time::millis(args.period_ms as f64), Time::nanos(args.step_size_ns as f64))
         .unwrap();
 
     println!("{} {:.0} {:.0}",

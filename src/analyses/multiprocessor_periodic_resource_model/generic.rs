@@ -3,7 +3,6 @@ use crate::prelude::*;
 use super::{
     MPRModel,
     sbf,
-    resource_from_sbf,
 };
 
 pub fn is_schedulable<FDem, FUb, FFilter>(
@@ -117,15 +116,60 @@ pub fn generate_interface<FProcLB, FProcUB, FResource>(
     )))
 }
 
-pub fn minimum_required_resource<FDem, FUb, FFilter>(
+// Given a taskset and a MPR Model's Period and number of CPUS, compute the
+// model's minimum resource by stepping through all the possible resource values
+// and checking for schedulability.
+pub fn minimum_required_resource<FResMin, FResMax, FSched>(
+    taskset: &[RTTask],
+    model: &MPRModelSpecification,
+    step_size: Time,
+    min_feasible_resource_fn: FResMin,
+    max_feasible_resource_fn: FResMax,
+    is_schedulable_fn: FSched,
+) -> Result<Time, Error>
+    where
+        FResMin: Fn(&[RTTask], &MPRModelSpecification) -> Result<Time, Error>,
+        FResMax: Fn(&[RTTask], &MPRModelSpecification) -> Result<Time, Error>,
+        FSched: Fn(&[RTTask], &MPRModel) -> Result<bool, Error>,
+{
+    let min_feasible_resource =
+        min_feasible_resource_fn(taskset, model)?.floor().as_nanos() as usize;
+    let max_feasible_resource =
+        max_feasible_resource_fn(taskset, model)?.ceil().as_nanos() as usize;
+
+    (min_feasible_resource ..= max_feasible_resource)
+        .step_by(step_size.as_nanos() as usize)
+        .map(|resource| Time::nanos(resource as f64))
+        .filter(|resource| {
+            let model = (*resource, model.clone()).into();
+
+            is_schedulable_fn(taskset, &model).unwrap_or(false)
+        })
+        .next()
+        .ok_or_else(|| Error::Generic(format!(
+            "Cannot schedule taskset with period {}ns and {} CPUS",
+            model.period.as_nanos(),
+            model.concurrency,
+        )))
+}
+
+// Given a taskset and a MPR Model's Period and number of CPUS, compute the
+// model's minimum resource. This needs the demand function (usually based on
+// the algorithm), a function which specified which intervals to check, and the
+// inverse of the Supply Bound Function that models your supply. It is also
+// possible to filter out some of the intervals, useful if it is possible to
+// compute which intervals have the same demand.
+pub fn minimum_required_resource_inv<FDem, FRSbf, FUb, FFilter>(
     taskset: &[RTTask],
     model: &MPRModelSpecification,
     demand_fn: FDem,
+    resource_from_sbf_fn: FRSbf,
     arrival_k_upperbound_fn: FUb,
     filter_intervals_fn: FFilter,
 ) -> Result<Time, Error>
     where
         FDem: Fn(&[RTTask], usize, &RTTask, &MPRModelSpecification, Time) -> Time,
+        FRSbf: Fn(Time, Time, &MPRModelSpecification) -> Time,
         FUb: Fn(&[RTTask], usize, &RTTask, &MPRModelSpecification) -> Result<Time, Error>,
         FFilter: Fn(&[RTTask], usize, &RTTask, &MPRModelSpecification, Time) -> bool,
 {
@@ -151,7 +195,7 @@ pub fn minimum_required_resource<FDem, FUb, FFilter>(
                 let demand = demand_fn(taskset, k, task_k, model, arrival_k);
 
                 let resource_at_arrival_k =
-                    resource_from_sbf(demand, interval, model.period, model.concurrency);
+                    resource_from_sbf_fn(demand, interval, model);
 
                 if resource_at_arrival_k > max_feasible_resource {
                     Err(Error::Generic(format!(
@@ -172,6 +216,10 @@ pub fn minimum_required_resource<FDem, FUb, FFilter>(
             best_resource_k
         ))
     })
+}
+
+pub fn minimum_resource_for_taskset(taskset: &[RTTask], model_period: Time) -> Time {
+    RTUtils::total_utilization(taskset) * model_period
 }
 
 impl Into<MPRModel> for (Time, MPRModelSpecification) {

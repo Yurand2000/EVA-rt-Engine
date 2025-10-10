@@ -24,36 +24,32 @@ impl MPRModel {
     }
 }
 
-// Equation 1 [1]
+// Definition 1 [2]
 pub fn sbf(model: &MPRModel, time: Time) -> Time {
-    #[inline(always)]
-    fn k(model: &MPRModel, time: Time) -> f64 {
-        (
-            (time - model.period + (model.resource / model.concurrency as f64).ceil()) /
-            model.period
-        ).floor()
-    }
+    let m = model.concurrency as f64;
+    let a = Time::floor(model.resource / m);
+    let b = model.resource - m * a;
+    let t1 = time - (model.period - Time::ceil(model.resource / m));
+    let x = t1 - model.period * f64::floor(t1 / model.period);
+    let y = model.period - a;
 
-    #[allow(non_snake_case)]
-    #[inline(always)]
-    fn I(model: &MPRModel, time: Time) -> Time {
-        time - 2.0 * model.period + (model.resource / model.concurrency as f64).ceil()
-    }
-
-    // sbf conditions
-    if time >= model.period - (model.resource / model.concurrency as f64).ceil() {
-        k(model, time) * model.resource
-            +
-        Time::max(
-            Time::zero(),
-            (I(model, time) - k(model, time) * model.period)
-                * model.concurrency as f64 + model.resource
-        )
-    } else {
+    if t1 < Time::zero() {
         Time::zero()
+    } else {
+        f64::floor(t1 / model.period) * model.resource
+            +
+        Time::max(Time::zero(), m*x - m*model.period + model.resource)
+            -
+        if x >= Time::one() && x < y {
+            Time::zero()
+        } else {
+            Time::nanos(m) - b
+        }
     }
 }
 
+#[deprecated]
+// Easwaran's SBF, from [2], is not monotone, thus exponential search cannot be applied.
 pub fn resource_from_sbf(sbf_v: Time, interval: Time, period: Time, concurrency: u64) -> Time {
     exp_search( 0.. , |resource| {
         let model = MPRModel {
@@ -68,14 +64,14 @@ pub fn resource_from_sbf(sbf_v: Time, interval: Time, period: Time, concurrency:
         .unwrap_or(Time::zero())
 }
 
-// Equation 2 [1]
+// Equation 2 [2]
 pub fn linear_sbf(model: &MPRModel, interval: Time) -> Time {
     let (resource, period, concurrency) = (model.resource, model.period, model.concurrency);
 
-    resource * (interval - 2.0 * (period - resource / concurrency as f64)) / period
+    resource / period * (interval - 2.0 * (period - resource / concurrency as f64) + Time::nanos(2.0))
 }
 
-// Extracted Theta from Equation 2 [1]
+// Extracted Theta from Equation 2 [2]
 pub fn resource_from_linear_sbf(lsbf: Time, interval: Time, period: Time, concurrency: u64) -> Time {
     // Note that this only works for positive values of the linear supply bound.
     // There is only one positive solution for a positive bound, but two
@@ -83,7 +79,7 @@ pub fn resource_from_linear_sbf(lsbf: Time, interval: Time, period: Time, concur
     debug_assert!(lsbf >= Time::zero());
 
     let concurrency = concurrency as f64;
-    let negb = 2.0 * period - interval;
+    let negb = 2.0 * period - interval + Time::nanos(2.0);
     let bsqr = negb * negb;
 
     concurrency * (negb + Time2::sqrt(bsqr + 8.0 * period * lsbf / concurrency) ) / 4.0
@@ -232,7 +228,7 @@ fn interference_hat(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, arriva
 // global EDF for MPR, inverse -------------------------------------------------
 
 // Section 5.1 [1]
-pub fn generate_interface_global_edf_simple(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
+pub fn generate_interface_global_edf_simple(taskset: &[RTTask], period: Time, step_size: Time) -> Result<MPRModel, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
@@ -242,11 +238,12 @@ pub fn generate_interface_global_edf_simple(taskset: &[RTTask], period: Time) ->
         generic::GenerationStrategy::MonotoneLinearSearch,
         num_processors_lower_bound,
         num_processors_upper_bound,
-        minimum_required_resource_edf,
+        |taskset, model|
+            minimum_required_resource_edf(taskset, model, step_size),
     )
 }
 
-pub fn generate_interface_global_edf(taskset: &[RTTask], period: Time) -> Result<MPRModel, Error> {
+pub fn generate_interface_global_edf(taskset: &[RTTask], period: Time, step_size: Time) -> Result<MPRModel, Error> {
     AnalysisUtils::assert_constrained_deadlines(taskset)?;
     AnalysisUtils::assert_integer_times(taskset)?;
 
@@ -256,49 +253,62 @@ pub fn generate_interface_global_edf(taskset: &[RTTask], period: Time) -> Result
         generic::GenerationStrategy::MonotoneBinarySearch,
         num_processors_lower_bound,
         num_processors_upper_bound,
-        minimum_required_resource_edf,
+        |taskset, model|
+            minimum_required_resource_edf(taskset, model, step_size),
     )
 }
 
 fn minimum_required_resource_edf(
     taskset: &[RTTask],
-    model: &generic::MPRModelSpecification
+    model: &generic::MPRModelSpecification,
+    step_size: Time,
 ) -> Result<Time, Error> {
     generic::minimum_required_resource(
         taskset,
         model,
-        |taskset, k, task_k, model, arrival_k|
-            demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
+        step_size,
+        |taskset, model|
+            Ok(generic::minimum_resource_for_taskset(taskset, model.period)),
+        |taskset, model|
+            generic::minimum_required_resource_inv(
+                taskset,
+                model,
+                |taskset, k, task_k, model, arrival_k|
+                    demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
+                |demand, interval, model|
+                    resource_from_linear_sbf(demand, interval, model.period, model.concurrency),
 
-        // To bound Ak as in Theorem 2 we must know the value of Theta.
-        // However, since Theta is being computed, we use its smallest
-        // (0) and largest (mPi) possible values to bound Ak. [1]
-        |_, _, _, model|
-            Ok(model.concurrency as f64 * model.period),
+                // To bound Ak as in Theorem 2 we must know the value of Theta.
+                // However, since Theta is being computed, we use its smallest
+                // (0) and largest (mPi) possible values to bound Ak. [1]
+                |_, _, _, model|
+                    Ok(model.concurrency as f64 * model.period),
 
-        // It is also easy to show that Equation (5) only needs to be
-        // evaluated at those values of Ak for which at least one  of
-        // I_hat, I_flat, or sbf change. [1]
-        //
-        // Both functions I_hat and I_flat change their value based on
-        // Wi and CIi, on a periodic basis: their values are the same
-        // every interval of the form [D_i + aT_i, D_i + T_I + aT_i] for
-        // all a >= 0. The I_hat function also changes in the interval
-        // [0, C_i]. The linear supply bound function changes at every
-        // interval, but we can consider only the intervals where I_hat
-        // and I_flat change, as it is a monotone function (i.e., if
-        // it's satisfied between those intervals, it will be also
-        // satisfied outside because of monotonicity).
-        |taskset, _, task_k, _, arrival_k| {
-            let interval = arrival_k + task_k.deadline;
+                // It is also easy to show that Equation (5) only needs to be
+                // evaluated at those values of Ak for which at least one  of
+                // I_hat, I_flat, or sbf change. [1]
+                //
+                // Both functions I_hat and I_flat change their value based on
+                // Wi and CIi, on a periodic basis: their values are the same
+                // every interval of the form [D_i + aT_i, D_i + T_I + aT_i] for
+                // all a >= 0. The I_hat function also changes in the interval
+                // [0, C_i]. The linear supply bound function changes at every
+                // interval, but we can consider only the intervals where I_hat
+                // and I_flat change, as it is a monotone function (i.e., if
+                // it's satisfied between those intervals, it will be also
+                // satisfied outside because of monotonicity).
+                |taskset, _, task_k, _, arrival_k| {
+                    let interval = arrival_k + task_k.deadline;
 
-            // Perform the test only where I_hat/I_flat values change.
-            taskset.iter().any(|task_i| {
-                let modulus = arrival_k % task_i.period;
+                    // Perform the test only where I_hat/I_flat values change.
+                    taskset.iter().any(|task_i| {
+                        let modulus = arrival_k % task_i.period;
 
-                interval <= task_i.wcet || modulus == Time::zero()
-            })
-        },
+                        interval <= task_i.wcet || modulus == Time::zero()
+                    })
+                },
+            ),
+        is_schedulable_edf,
     )
 }
 
@@ -458,3 +468,6 @@ pub fn simple_vs_optimized() {
 // [1] I. Shin, A. Easwaran, and I. Lee, “Hierarchical Scheduling Framework for
 //     Virtual Clustering of Multiprocessors,” in 2008 Euromicro Conference on
 //     Real-Time Systems, July 2008, pp. 181–190. doi: 10.1109/ECRTS.2008.28.
+// [2] A. Easwaran, I. Shin, and I. Lee, “Optimal Virtual Cluster-based
+//     Multiprocessor Scheduling,” Real-Time Syst, vol. 43, no. 1, pp. 25–59,
+//     Sept. 2009, doi: 10.1007/s11241-009-9073-x.
