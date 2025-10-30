@@ -140,12 +140,11 @@ pub fn minimum_required_resource<FResMin, FResMax, FSched>(
     (min_feasible_resource ..= max_feasible_resource)
         .step_by(step_size.as_nanos() as usize)
         .map(|resource| Time::nanos(resource as f64))
-        .filter(|resource| {
+        .find(|resource| {
             let model = (*resource, model.clone()).into();
 
             is_schedulable_fn(taskset, &model).unwrap_or(false)
         })
-        .next()
         .ok_or_else(|| Error::Generic(format!(
             "Cannot schedule taskset with period {}ns and {} CPUS",
             model.period.as_nanos(),
