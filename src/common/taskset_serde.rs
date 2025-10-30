@@ -3,6 +3,7 @@ use crate::prelude::*;
 pub mod prelude {
     pub use super::{
         TasksetFileType,
+        TasksetPlainUnit,
         TasksetParseError,
         parse_taskset,
     };
@@ -17,6 +18,15 @@ pub enum TasksetFileType {
     Plain,
 }
 
+#[derive(Debug, Clone, Copy)]
+#[derive(PartialEq, Eq)]
+#[derive(clap::ValueEnum)]
+pub enum TasksetPlainUnit {
+    Millis,
+    Micros,
+    Nanos
+}
+
 #[derive(Debug)]
 pub enum TasksetParseError {
     IOError(std::io::Error),
@@ -26,7 +36,7 @@ pub enum TasksetParseError {
 
 pub fn parse_taskset(
     taskset: &str,
-    typ: TasksetFileType
+    typ: TasksetFileType,
 ) -> Result<Vec<RTTask>, TasksetParseError> {
     use TasksetFileType::*;
 
@@ -49,24 +59,31 @@ pub fn parse_taskset(
     let taskset_data = match extension {
         Auto => panic!("Unexpected Auto Extension"),
         JSON => serde_json::from_str(&taskset_data)?,
-        Plain => plain_deserialize_taskset(&taskset_data)?,
+        Plain => plain_deserialize_taskset(&taskset_data, TasksetPlainUnit::Millis)?,
     };
 
     Ok(taskset_data)
 }
 
-fn plain_deserialize_taskset(data: &str) -> Result<Vec<RTTask>, TasksetParseError> {
+pub fn plain_deserialize_taskset(data: &str, unit: TasksetPlainUnit) -> Result<Vec<RTTask>, TasksetParseError> {
     data.trim_ascii()
         .lines()
-        .map(|line| plain_deserialize_task(line))
+        .map(|line| plain_deserialize_task(line, unit))
         .collect()
 }
 
-fn plain_deserialize_task(data: &str) -> Result<RTTask, TasksetParseError> {
+fn plain_deserialize_task(data: &str, unit: TasksetPlainUnit) -> Result<RTTask, TasksetParseError> {
     let fields: Vec<&str> = data
         .trim_ascii()
         .split_ascii_whitespace()
         .collect();
+
+    let multiplier =
+        match unit {
+            TasksetPlainUnit::Millis => Time::MILLI_TO_NANO,
+            TasksetPlainUnit::Micros => Time::MICRO_TO_NANO,
+            TasksetPlainUnit::Nanos => 1.0,
+        };
 
     if fields.len() != 3 {
         return Err(TasksetParseError::PlainParseError(
@@ -75,20 +92,20 @@ fn plain_deserialize_task(data: &str) -> Result<RTTask, TasksetParseError> {
     }
 
     Ok(RTTask {
-        wcet: Time::millis(fields[0].parse()
+        wcet: Time::nanos(fields[0].parse::<f64>()
             .map_err(|err| TasksetParseError::PlainParseError(
                 format!("Failed to parse field 'wcet': {err}")
-            ))?
+            ))? * multiplier
         ),
-        deadline: Time::millis(fields[1].parse()
+        deadline: Time::nanos(fields[1].parse::<f64>()
             .map_err(|err| TasksetParseError::PlainParseError(
                 format!("Failed to parse field 'deadline': {err}")
-            ))?
+            ))? * multiplier
         ),
-        period: Time::millis(fields[2].parse()
+        period: Time::nanos(fields[2].parse::<f64>()
             .map_err(|err| TasksetParseError::PlainParseError(
                 format!("Failed to parse field 'period': {err}")
-            ))?
+            ))? * multiplier
         ),
     })
 }
