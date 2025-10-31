@@ -31,8 +31,9 @@ pub struct Args {
 fn main() {
     let args = <Args as clap::Parser>::parse();
 
+    let taskset_data = std::fs::read_to_string(&args.taskset_file).unwrap();
     let taskset = plain_deserialize_taskset(
-        &args.taskset_file,
+        &taskset_data,
         args.taskset_unit,
     ).unwrap();
 
@@ -49,9 +50,16 @@ fn main() {
         .min_by_key(|model| model.resource)
         .unwrap();
 
+    let scale =
+        match args.taskset_unit {
+            TasksetPlainUnit::Millis => Time::MILLI_TO_NANO,
+            TasksetPlainUnit::Micros => Time::MICRO_TO_NANO,
+            TasksetPlainUnit::Nanos => 1.0,
+        };
+
     println!("{} {:.0} {:.0}",
         model.concurrency,
-        (model.resource / model.concurrency as f64).as_millis().ceil(),
-        model.period.as_millis().ceil()
+        (model.resource / (model.concurrency as f64 * scale)).ceil().as_nanos(),
+        (model.period / scale).ceil().as_nanos()
     );
 }
