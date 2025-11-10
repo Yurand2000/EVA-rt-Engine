@@ -313,13 +313,13 @@ fn minimum_required_resource_edf(
 }
 
 #[inline(always)]
-fn num_processors_lower_bound(taskset: &[RTTask]) -> u64 {
+pub fn num_processors_lower_bound(taskset: &[RTTask]) -> u64 {
     f64::ceil(RTUtils::total_utilization(taskset)) as u64
 }
 
 // Section 5.1, Lemma 4 [1]
 #[inline(always)]
-fn num_processors_upper_bound(taskset: &[RTTask]) -> u64 {
+pub fn num_processors_upper_bound(taskset: &[RTTask]) -> u64 {
     debug_assert!(!taskset.is_empty());
 
     let n = taskset.len() as u64;

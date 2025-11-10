@@ -61,7 +61,7 @@ pub fn generate_interface_global_edf_simple(taskset: &[RTTask], period: Time, st
     )
 }
 
-fn demand_edf(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
+pub fn demand_edf(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
     global_earliest_deadline_first_demand(taskset, k, task_k)
         +
     concurrency as f64 * task_k.wcet
@@ -115,7 +115,7 @@ pub fn generate_interface_global_fp(taskset: &[RTTask], period: Time, step_size:
     )
 }
 
-fn demand_fp(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
+pub fn demand_fp(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
     global_fixed_priority_demand(taskset, k, task_k)
         +
     concurrency as f64 * (task_k.wcet - Time::one())
