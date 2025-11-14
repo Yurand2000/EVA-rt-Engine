@@ -1,4 +1,5 @@
-use eva_engine::{common::taskset_serde::plain_deserialize_taskset, prelude::*};
+use eva_engine::prelude::*;
+use eva_engine::common::taskset_serde::prelude::*;
 
 #[derive(clap::Parser)]
 pub struct Args {
@@ -32,7 +33,7 @@ fn main() {
     let args = <Args as clap::Parser>::parse();
 
     let taskset_data = std::fs::read_to_string(&args.taskset_file).unwrap();
-    let taskset = plain_deserialize_taskset(
+    let taskset = eva_engine::common::taskset_serde::plain_deserialize_taskset(
         &taskset_data,
         args.taskset_unit,
     ).unwrap();
