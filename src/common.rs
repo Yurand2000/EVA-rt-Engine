@@ -57,6 +57,11 @@ impl Time {
     pub fn millis(time_ms: f64) -> Self {
         Self { value_ns: time_ms * Self::MILLI_TO_NANO }
     }
+
+    pub fn secs(time_s: f64) -> Self {
+        Self { value_ns: time_s * Self::SECS_TO_NANO }
+    }
+
     pub fn as_nanos(&self) -> f64 {
         self.value_ns
     }
@@ -67,6 +72,10 @@ impl Time {
 
     pub fn as_millis(&self) -> f64 {
         self.value_ns / Self::MILLI_TO_NANO
+    }
+
+    pub fn as_secs(&self) -> f64 {
+        self.value_ns / Self::SECS_TO_NANO
     }
 
     pub fn floor(self) -> Self {
