@@ -12,7 +12,7 @@ pub fn is_schedulable(taskset: &[RTTask], cpus: usize) -> Result<bool, Error> {
     let mut task_rts = vec![Time::zero(); taskset.len()];
 
     for (k, task_k) in taskset.iter().enumerate() {
-        let task_k_rt = response_time(taskset, k, cpus, &task_rts);
+        let task_k_rt = response_time(taskset, k, cpus, &task_rts[0..k]);
         if task_k_rt > task_k.deadline {
             return Ok(false);
         }
@@ -38,7 +38,7 @@ pub fn workload_carry_in(interval: Time, task: &RTTask, task_rt: Time) -> Time {
         + Time::clamp(
             work_interval % task.period - (task.period - task_rt),
             Time::zero(),
-            task.wcet - Time::one(),
+            Time::max(task.wcet - Time::one(), Time::zero()),
         )
 }
 
@@ -47,7 +47,7 @@ pub fn interference_non_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTas
     Time::clamp(
         workload_non_carry_in(interval, task_i),
         Time::zero(),
-        interval - task_k.wcet + Time::one()
+        Time::max(interval - task_k.wcet + Time::one(), Time::zero())
     )
 }
 
@@ -56,7 +56,7 @@ pub fn interference_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTask, t
     Time::clamp(
         workload_carry_in(interval, task_i, task_i_rt),
         Time::zero(),
-        interval - task_k.wcet + Time::one()
+        Time::max(interval - task_k.wcet + Time::one(), Time::zero())
     )
 }
 
@@ -84,7 +84,7 @@ pub fn total_interference(interval: Time, cpus: usize, taskset: &[RTTask], k: us
     interference_diffs.sort_unstable();
 
     interferences_non_carry_in.into_iter().sum::<Time>() +
-        interference_diffs.into_iter().take(cpus - 1).sum::<Time>()
+        interference_diffs.into_iter().rev().take(cpus - 1).sum::<Time>()
 }
 
 // Equation 12 [1]
@@ -97,6 +97,7 @@ pub fn response_time(taskset: &[RTTask], k: usize, cpus: usize, task_rts: &[Time
             return x;
         }
 
+        debug_assert!(x > prev_x);
         prev_x = x;
     }
 }
