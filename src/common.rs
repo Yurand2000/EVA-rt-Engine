@@ -188,16 +188,16 @@ impl std::iter::Sum for Time {
 impl std::fmt::Display for Time {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let milli = self.value_ns / Self::MILLI_TO_NANO;
-        if milli >= 0.0 {
-            return write!(f, "{milli:.3} ms");
+        if milli >= 1.0 {
+            return write!(f, "{milli:.3}ms");
         }
 
         let micro = self.value_ns / Self::MICRO_TO_NANO;
-        if micro >= 0.0 {
-            return write!(f, "{micro:.3} us");
+        if micro >= 1.0 {
+            return write!(f, "{micro:.3}us");
         }
 
-        write!(f, "{:.3} ns", self.value_ns)
+        write!(f, "{:.3}ns", self.value_ns)
     }
 }
 
