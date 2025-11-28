@@ -63,6 +63,7 @@ pub fn generate_interface<FProcLB, FProcUB, FResource>(
         FResource: Fn(&[RTTask], &MPRModelSpecification) -> Result<Time, Error>
 {
     use GenerationStrategy::*;
+    use crate::common::binary_search::*;
 
     let lb = num_processors_lower_bound(taskset);
     let ub = num_processors_upper_bound(taskset);

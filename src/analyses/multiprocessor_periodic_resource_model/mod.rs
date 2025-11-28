@@ -51,6 +51,8 @@ pub fn sbf(model: &MPRModel, time: Time) -> Time {
 #[deprecated]
 // Easwaran's SBF, from [2], is not monotone, thus exponential search cannot be applied.
 pub fn resource_from_sbf(sbf_v: Time, interval: Time, period: Time, concurrency: u64) -> Time {
+    use crate::common::binary_search::*;
+
     exp_search( 0.. , |resource| {
         let model = MPRModel {
             resource: Time::nanos(resource as f64),
