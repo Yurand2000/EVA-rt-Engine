@@ -8,7 +8,7 @@ use super::{
 };
 
 // demands for deadline monotonic and earliest deadline first, from [1]
-use crate::analyses::smp_earliest_deadline_first::bcl_2009::{
+use crate::algorithms::smp_earliest_deadline_first::bcl_2009::{
     global_earliest_deadline_first_demand,
     global_fixed_priority_demand,
 };

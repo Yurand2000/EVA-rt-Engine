@@ -44,7 +44,7 @@ fn main() {
         (min_period ..= args.max_period_us)
         .step_by(args.period_step_us as usize)
         .map(|period_ns| {
-            eva_rt_engine::analyses::multiprocessor_periodic_resource_model::bcl_2009::
+            eva_rt_engine::algorithms::multiprocessor_periodic_resource_model::bcl_2009::
                 generate_interface_global_fp(&taskset, Time::nanos(period_ns as f64), Time::nanos(args.step_size_ns as f64))
             .unwrap()
         })

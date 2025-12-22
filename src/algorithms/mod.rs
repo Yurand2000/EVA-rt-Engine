@@ -1,3 +1,5 @@
+//! Root Module containing all the implemented analyses
+
 use crate::prelude::*;
 
 pub mod prelude {
@@ -10,15 +12,16 @@ pub mod prelude {
 // Single Processor scheduling
 pub mod up_earliest_deadline_first;
 pub mod up_fixed_priority;
-
-pub mod response_time_analysis;
+pub mod rta86;
 
 // Single Processor Hierarchical scheduling
 
-// Multi Processor scheduling
+// Multi Processor Global scheduling
 pub mod smp_earliest_deadline_first;
 pub mod smp_fixed_priority;
 pub mod smp_generic;
+
+// Multi Processor Partitioned scheduling
 
 // Multi Processor Hierarchical scheduling
 pub mod multiprocessor_periodic_resource_model;
