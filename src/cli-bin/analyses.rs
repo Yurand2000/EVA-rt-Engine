@@ -1,11 +1,11 @@
-use eva_engine::prelude::*;
+use eva_rt_engine::prelude::*;
 
 pub fn uniprocessor_edf(
     taskset: &[RTTask],
     single_test: Option<&str>,
     quiet: bool,
 ) -> Result<bool, Box<dyn std::error::Error>> {
-    use eva_engine::analyses::up_earliest_deadline_first::*;
+    use eva_rt_engine::analyses::up_earliest_deadline_first::*;
 
     let tests: &[(_, _, fn(&[RTTask]) -> Result<bool, Error> )] = &[
         ("classic", "Rate Monotonic - Liu & Layland 1973", liu_layland_73),
@@ -19,7 +19,7 @@ pub fn uniprocessor_fp(
     single_test: Option<&str>,
     quiet: bool,
 ) -> Result<bool, Box<dyn std::error::Error>> {
-    use eva_engine::analyses::up_fixed_priority::*;
+    use eva_rt_engine::analyses::up_fixed_priority::*;
 
     let tests: &[(_, _, fn(&[RTTask]) -> Result<bool, Error> )] = &[
         ("rm-simplified", "Rate Monotonic - Liu & Layland 1973 (Simplified)", rate_monotonic::is_schedulable_simple),
@@ -38,7 +38,7 @@ pub fn global_earliest_deadline_first(
     single_test: Option<&str>,
     quiet: bool,
 ) -> Result<bool, Box<dyn std::error::Error>> {
-    use eva_engine::analyses::smp_earliest_deadline_first::*;
+    use eva_rt_engine::analyses::smp_earliest_deadline_first::*;
 
     let tests: &[(_, _, fn(&[RTTask], u64) -> Result<bool, Error> )] = &[
         ("gbf", "GBF Test", gfb_test_sporadic),
@@ -56,7 +56,7 @@ pub fn global_fixed_priority(
     single_test: Option<&str>,
     quiet: bool,
 ) -> Result<bool, Box<dyn std::error::Error>> {
-    use eva_engine::analyses::smp_fixed_priority::*;
+    use eva_rt_engine::analyses::smp_fixed_priority::*;
 
     let tests: &[(_, _, fn(&[RTTask], u64) -> Result<bool, Error> )] = &[
         ("bcl", "Deadline Monotonic - BCL Test", deadline_monotonic::is_schedulable),
@@ -67,7 +67,7 @@ pub fn global_fixed_priority(
 
 fn print_test_result(
     test_name: &str,
-    res: Result<bool, eva_engine::analyses::Error>,
+    res: Result<bool, eva_rt_engine::analyses::Error>,
     quiet: bool,
 ) -> Result<bool, Box<dyn std::error::Error>> {
     match res {
@@ -82,7 +82,7 @@ fn print_test_result(
 
             Ok(success)
         },
-        Err(err @ eva_engine::analyses::Error::Generic(_)) => Err(err.into()),
+        Err(err @ eva_rt_engine::analyses::Error::Generic(_)) => Err(err.into()),
         Err(err) => {
             if !quiet {
                 println!("{test_name}: Error\n    {err}");

@@ -2,17 +2,30 @@
 
 **Evaluation**, **Verification** and **Analysis Engine** for **Real-Time** applications schedulability.
 
+## 🎯 What is EVA-rt-Engine?
+
+**EVA-rt-Engine** (short as *EVA*) is a software created to perform real-time schedulability analyses.
+
+EVA implements a variety of *state-of-the-art* tests to assert wheter a given taskset is schedulable on a given platform. Additionally, it also implements designers that search for the minimum required resources to schedule the given task on the given platform and scheduling approach.
+
+EVA is distributed under the GPL3 license, both as a standalone tool and as a Rust library that can be easily integrated in other Rust-based projects.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Rust**: ≥1.85.1
 
-### Installation
-
-Standard **Rust** based software:
+### Installation (as library)
 
 ```bash
+> cargo add --git https://github.com/Yurand2000/EVA-rt-Engine.git
+```
+
+### Installation (as tool)
+
+```bash
+# clone the git repository locally and...
 > cargo build (--release)
 ```
 
@@ -132,6 +145,15 @@ This taskset is comprised of 3 tasks. The highest priority task (if using *fixed
 - Global Fixed Priority
   - [**Deadline Monotonic**](src/analyses/smp_fixed_priority/deadline_monotonic/README.md)
 - [**Global Earliest Deadline First**](src/analyses/smp_earliest_deadline_first/README.md)
+
+## 🛠️ Future Work
+
+- [ ] Documentation
+- [ ] [📦 crates.io](crate.io) release
+- [ ] JSOM/YML Support
+- [ ] Partitioned Multi-Processor Designers
+- [ ] Hierarchical Scheduling Designers
+- [ ] *More analyses...*
 
 ## 📄 License
 
