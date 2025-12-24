@@ -19,7 +19,8 @@ pub mod prelude {
     pub use super::algorithms::prelude::*;
     pub use super::{
         SchedError,
-        SchedResult
+        SchedResult,
+        SchedErrors,
     };
 }
 
@@ -52,18 +53,6 @@ impl std::error::Error for SchedError {}
 pub type SchedResult<T> = Result<T, SchedError>;
 
 impl SchedError {
-    pub fn non_schedulable<T>(err: anyhow::Error) -> SchedResult<T> {
-        Err(SchedError::NonSchedulable(err))
-    }
-
-    pub fn precondition<T>(err: anyhow::Error) -> SchedResult<T> {
-        Err(SchedError::Precondition(err))
-    }
-
-    pub fn other<T>(err: anyhow::Error) -> SchedResult<T> {
-        Err(SchedError::Other(err))
-    }
-
     pub fn is_non_scheduable(&self) -> bool {
         match self {
             Self::NonSchedulable(_) => true,
@@ -71,17 +60,57 @@ impl SchedError {
         }
     }
 
-    pub fn precondition_error(&self) -> bool {
+    pub fn is_precondition_error(&self) -> bool {
         match self {
             Self::Precondition(_) => true,
             _ => false,
         }
     }
 
-    pub fn other_error(&self) -> bool {
+    pub fn is_other_error(&self) -> bool {
         match self {
             Self::Other(_) => true,
             _ => false,
         }
+    }
+}
+
+pub struct SchedErrors<'a>(&'a str);
+
+impl<'a> SchedErrors<'a> {
+    pub fn non_schedulable<T>(self) -> SchedResult<T> {
+        Err(SchedError::NonSchedulable(anyhow::format_err!("{}, non schedulable.", self.0)))
+    }
+
+    pub fn non_schedulable_reason<T>(self, reason: std::fmt::Arguments) -> SchedResult<T> {
+        Err(SchedError::NonSchedulable(anyhow::format_err!("{}, non schedulable; reason: {}", self.0, reason)))
+    }
+
+    pub fn precondition<T>(self) -> SchedResult<T> {
+        Err(SchedError::Precondition(anyhow::format_err!("{}, precondition unsatisfied.", self.0)))
+    }
+
+    pub fn precondition_reason<T>(self, reason: std::fmt::Arguments) -> SchedResult<T> {
+        Err(SchedError::Precondition(anyhow::format_err!("{}, precondition unsatisfied; reason: {}", self.0, reason)))
+    }
+
+    pub fn implicit_deadlines<T>(self) -> SchedResult<T> {
+        Err(SchedError::Precondition(anyhow::format_err!(
+            "{}, taskset must have implicit deadlines.", self.0)))
+    }
+
+    pub fn constrained_deadlines<T>(self) -> SchedResult<T> {
+        Err(SchedError::Precondition(anyhow::format_err!(
+            "{}, taskset must have constrained deadlines.", self.0)))
+    }
+
+    pub fn rate_monotonic<T>(self) -> SchedResult<T> {
+        Err(SchedError::Precondition(anyhow::format_err!(
+            "{}, taskset must be sorted by period.", self.0)))
+    }
+
+    pub fn deadline_monotonic<T>(self) -> SchedResult<T> {
+        Err(SchedError::Precondition(anyhow::format_err!(
+            "{}, taskset must be sorted by deadline.", self.0)))
     }
 }

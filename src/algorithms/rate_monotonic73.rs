@@ -24,12 +24,19 @@
 use crate::prelude::*;
 use eva_rt_common::utils::RTUtils;
 
+const ALGORITHM: &str = "Fixed Priority RM (Liu & Layland 1973)";
+
 /// Fixed Priority Rate Monotonic, Liu & Layland 1973 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
-    assert_rate_monotonic_assignment(taskset)?;
-    assert_implicit_deadlines(taskset)?;
+    if !RTUtils::is_taskset_sorted_by_period(taskset) {
+        return SchedErrors(ALGORITHM).rate_monotonic();
+    }
+
+    if !RTUtils::implicit_deadlines(taskset) {
+        return SchedErrors(ALGORITHM).implicit_deadlines();
+    }
 
     // Theorem 5: let m = #Tasks, lub(Utilization) = m * (2^(1/m) - 1)
     let total_utilization = RTUtils::total_utilization(taskset);
@@ -39,8 +46,7 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
     if total_utilization <= rate_monotonic_lub {
         Ok(())
     } else {
-        SchedError::non_schedulable(anyhow::format_err!(
-            "Fixed Priority RM (Liu & Layland 1973), non schedulable"))
+        SchedErrors(ALGORITHM).non_schedulable()
     }
 }
 
@@ -50,8 +56,13 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
 ///
 /// Use the limit approximation for the least upper bound on the total utilization.
 pub fn is_schedulable_simple(taskset: &[RTTask]) -> SchedResult<()> {
-    assert_rate_monotonic_assignment(taskset)?;
-    assert_implicit_deadlines(taskset)?;
+    if !RTUtils::is_taskset_sorted_by_period(taskset) {
+        return SchedErrors(ALGORITHM).rate_monotonic();
+    }
+
+    if !RTUtils::implicit_deadlines(taskset) {
+        return SchedErrors(ALGORITHM).implicit_deadlines();
+    }
 
     // Theorem 5
     let total_utilization = RTUtils::total_utilization(taskset);
@@ -63,25 +74,6 @@ pub fn is_schedulable_simple(taskset: &[RTTask]) -> SchedResult<()> {
     if total_utilization <= rate_monotonic_lub {
         Ok(())
     } else {
-        SchedError::non_schedulable(anyhow::format_err!(
-            "Fixed Priority RM (Liu & Layland 1973), non schedulable"))
-    }
-}
-
-fn assert_implicit_deadlines(taskset: &[RTTask]) -> SchedResult<()> {
-    if RTUtils::implicit_deadlines(taskset) {
-        Ok(())
-    } else {
-        SchedError::precondition(anyhow::format_err!(
-            "Fixed Priority RM (Liu & Layland 1973), taskset must have implicit deadlines"))
-    }
-}
-
-fn assert_rate_monotonic_assignment(taskset: &[RTTask]) -> SchedResult<()> {
-    if RTUtils::is_taskset_sorted_by_period(taskset) {
-        Ok(())
-    } else {
-        SchedError::precondition(anyhow::format_err!(
-            "Fixed Priority RM (Liu & Layland 1973), taskset must be sorted by period"))
+        SchedErrors(ALGORITHM).non_schedulable()
     }
 }

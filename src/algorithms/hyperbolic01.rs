@@ -21,12 +21,19 @@
 use crate::prelude::*;
 use eva_rt_common::utils::RTUtils;
 
+const ALGORITHM: &str = "Fixed Priority RM Hyperbolic (Bini, Buttazzo, Buttazzo 2001)";
+
 /// Fixed Priority RM Hyperbolic, Bini, Buttazzo, Buttazzo 2001 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
-    assert_rate_monotonic_assignment(taskset)?;
-    assert_implicit_deadlines(taskset)?;
+    if !RTUtils::is_taskset_sorted_by_period(taskset) {
+        return SchedErrors(ALGORITHM).rate_monotonic();
+    }
+
+    if !RTUtils::implicit_deadlines(taskset) {
+        return SchedErrors(ALGORITHM).implicit_deadlines();
+    }
 
     // Theorem 1
     let bound: f64 =
@@ -37,25 +44,6 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
     if bound <= 2f64 {
         Ok(())
     } else {
-        SchedError::non_schedulable(anyhow::format_err!(
-            "Fixed Priority RM Hyperbolic (Bini, Buttazzo, Buttazzo 2001), non schedulable"))
-    }
-}
-
-fn assert_implicit_deadlines(taskset: &[RTTask]) -> SchedResult<()> {
-    if RTUtils::implicit_deadlines(taskset) {
-        Ok(())
-    } else {
-        SchedError::precondition(anyhow::format_err!(
-            "Fixed Priority RM Hyperbolic (Bini, Buttazzo, Buttazzo 2001), taskset must have implicit deadlines"))
-    }
-}
-
-fn assert_rate_monotonic_assignment(taskset: &[RTTask]) -> SchedResult<()> {
-    if RTUtils::is_taskset_sorted_by_period(taskset) {
-        Ok(())
-    } else {
-        SchedError::precondition(anyhow::format_err!(
-            "Fixed Priority RM Hyperbolic (Bini, Buttazzo, Buttazzo 2001), taskset must be sorted by period"))
+        SchedErrors(ALGORITHM).non_schedulable()
     }
 }

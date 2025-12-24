@@ -19,6 +19,8 @@
 use crate::prelude::*;
 use eva_rt_common::utils::RTUtils;
 
+const ALGORITHM: &str = "RTA (Joseph & Pandya 1986)";
+
 /// Response Time Analysis, Joseph & Pandya 1986 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
@@ -27,15 +29,12 @@ use eva_rt_common::utils::RTUtils;
 /// - Worst-Case Response Times of each task.
 pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<Vec<Time>> {
     if !RTUtils::constrained_deadlines(taskset) {
-        return SchedError::precondition(
-            anyhow::format_err!("RTA (Joseph & Pandya 1986) works only \
-                                 with constrained deadlines."));
+        return SchedErrors(ALGORITHM).constrained_deadlines();
     }
 
     if !avg_processing_load_is_met(taskset) {
-        return SchedError::non_schedulable(
-            anyhow::format_err!("RTA (Joseph & Pandya 1986) average processing \
-                                 load is not met."));
+        return SchedErrors(ALGORITHM).non_schedulable_reason(
+            format_args!("average processing load is not met."));
     }
 
     let response_times = taskset.iter().enumerate()
@@ -44,8 +43,8 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<Vec<Time>> {
             let mut acc = acc?;
 
             if response_time > task.deadline {
-                SchedError::non_schedulable(anyhow::format_err!(
-                    "RTA (Joseph & Pandya 1986); task {i} misses its deadline."))
+                SchedErrors(ALGORITHM).non_schedulable_reason(
+                    format_args!("task {i} misses its deadline."))
             } else {
                 acc.push(response_time);
                 Ok(acc)
