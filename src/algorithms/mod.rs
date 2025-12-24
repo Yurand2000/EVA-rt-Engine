@@ -10,6 +10,9 @@ pub mod prelude {
 }
 
 // Single Processor scheduling
+pub mod rate_monotonic73;
+pub mod hyperbolic01;
+
 pub mod up_earliest_deadline_first;
 pub mod up_fixed_priority;
 pub mod rta86;
