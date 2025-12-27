@@ -19,6 +19,7 @@ pub mod hyperbolic01;
 pub mod up_earliest_deadline_first;
 
 // Single Processor Hierarchical scheduling
+// Fully Preemptive Fixed Priority
 
 // Multi Processor Global scheduling
 pub mod smp_earliest_deadline_first;

@@ -34,7 +34,7 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<Vec<Time>> {
 
     if !avg_processing_load_is_met(taskset) {
         return SchedErrors(ALGORITHM).non_schedulable_reason(
-            format_args!("average processing load is not met."));
+            anyhow::format_err!("average processing load is not met."));
     }
 
     let response_times = taskset.iter().enumerate()
@@ -44,7 +44,7 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<Vec<Time>> {
 
             if response_time > task.deadline {
                 SchedErrors(ALGORITHM).non_schedulable_reason(
-                    format_args!("task {i} misses its deadline."))
+                    anyhow::format_err!("task {i} misses its deadline."))
             } else {
                 acc.push(response_time);
                 Ok(acc)
