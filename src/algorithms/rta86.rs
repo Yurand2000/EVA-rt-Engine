@@ -29,29 +29,32 @@ const ALGORITHM: &str = "RTA (Joseph & Pandya 1986)";
 /// - Worst-Case Response Times of each task.
 pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<Vec<Time>> {
     if !RTUtils::constrained_deadlines(taskset) {
-        return SchedErrors(ALGORITHM).constrained_deadlines();
+        return SchedResultFactory(ALGORITHM).constrained_deadlines();
     }
 
     if !avg_processing_load_is_met(taskset) {
-        return SchedErrors(ALGORITHM).non_schedulable_reason(
+        return SchedResultFactory(ALGORITHM).non_schedulable_reason(
             anyhow::format_err!("average processing load is not met."));
     }
 
-    let response_times = taskset.iter().enumerate()
-        .map(|(i, task)| (i, task, response_time(&taskset[0..=i])) )
-        .fold(Ok(Vec::with_capacity(taskset.len())), |acc, (i, task, response_time)| {
-            let mut acc = acc?;
+    match taskset.iter().enumerate()
+        .map(|(i, task)| {
+            let response_time = response_time(&taskset[0..=i]);
 
             if response_time > task.deadline {
-                SchedErrors(ALGORITHM).non_schedulable_reason(
-                    anyhow::format_err!("task {i} misses its deadline."))
+                Err(anyhow::format_err!("task {i} misses its deadline."))
             } else {
-                acc.push(response_time);
-                Ok(acc)
+                Ok(response_time)
             }
-        });
+        })
+        .collect()
+    {
+        Ok(response_times) =>
+            SchedResultFactory(ALGORITHM).schedulable(response_times),
+        Err(error) =>
+            SchedResultFactory(ALGORITHM).non_schedulable_reason(error),
+    }
 
-    response_times
 }
 
 // Condition 4 [1]
@@ -109,5 +112,5 @@ fn example_2() {
     assert_eq!(response_time(&taskset[0..=3]), Time::nanos(2490.0));
     assert_eq!(response_time(&taskset[0..=4]), Time::nanos(6991.0));
 
-    assert!(is_schedulable(&taskset).is_err_and(|err| err.is_non_scheduable()));
+    assert!(is_schedulable(&taskset).is_not_schedulable());
 }

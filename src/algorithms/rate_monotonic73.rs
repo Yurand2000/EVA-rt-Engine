@@ -31,11 +31,11 @@ const ALGORITHM: &str = "Fixed Priority RM (Liu & Layland 1973)";
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
     if !RTUtils::is_taskset_sorted_by_period(taskset) {
-        return SchedErrors(ALGORITHM).rate_monotonic();
+        return SchedResultFactory(ALGORITHM).rate_monotonic();
     }
 
     if !RTUtils::implicit_deadlines(taskset) {
-        return SchedErrors(ALGORITHM).implicit_deadlines();
+        return SchedResultFactory(ALGORITHM).implicit_deadlines();
     }
 
     // Theorem 5: let m = #Tasks, lub(Utilization) = m * (2^(1/m) - 1)
@@ -44,9 +44,9 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
         (taskset.len() as f64) * (f64::powf(2.0, 1.0 / taskset.len() as f64) - 1.0);
 
     if total_utilization <= rate_monotonic_lub {
-        Ok(())
+        SchedResultFactory(ALGORITHM).schedulable(())
     } else {
-        SchedErrors(ALGORITHM).non_schedulable()
+        SchedResultFactory(ALGORITHM).non_schedulable()
     }
 }
 
@@ -57,11 +57,11 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
 /// Use the limit approximation for the least upper bound on the total utilization.
 pub fn is_schedulable_simple(taskset: &[RTTask]) -> SchedResult<()> {
     if !RTUtils::is_taskset_sorted_by_period(taskset) {
-        return SchedErrors(ALGORITHM).rate_monotonic();
+        return SchedResultFactory(ALGORITHM).rate_monotonic();
     }
 
     if !RTUtils::implicit_deadlines(taskset) {
-        return SchedErrors(ALGORITHM).implicit_deadlines();
+        return SchedResultFactory(ALGORITHM).implicit_deadlines();
     }
 
     // Theorem 5
@@ -72,8 +72,8 @@ pub fn is_schedulable_simple(taskset: &[RTTask]) -> SchedResult<()> {
     let rate_monotonic_lub = f64::ln(2f64);
 
     if total_utilization <= rate_monotonic_lub {
-        Ok(())
+        SchedResultFactory(ALGORITHM).schedulable(())
     } else {
-        SchedErrors(ALGORITHM).non_schedulable()
+        SchedResultFactory(ALGORITHM).non_schedulable()
     }
 }

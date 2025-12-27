@@ -28,11 +28,11 @@ const ALGORITHM: &str = "Fixed Priority RM Hyperbolic (Bini, Buttazzo, Buttazzo 
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
     if !RTUtils::is_taskset_sorted_by_period(taskset) {
-        return SchedErrors(ALGORITHM).rate_monotonic();
+        return SchedResultFactory(ALGORITHM).rate_monotonic();
     }
 
     if !RTUtils::implicit_deadlines(taskset) {
-        return SchedErrors(ALGORITHM).implicit_deadlines();
+        return SchedResultFactory(ALGORITHM).implicit_deadlines();
     }
 
     // Theorem 1
@@ -42,8 +42,8 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
         .product();
 
     if bound <= 2f64 {
-        Ok(())
+        SchedResultFactory(ALGORITHM).schedulable(())
     } else {
-        SchedErrors(ALGORITHM).non_schedulable()
+        SchedResultFactory(ALGORITHM).non_schedulable()
     }
 }

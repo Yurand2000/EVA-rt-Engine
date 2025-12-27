@@ -1,34 +1,11 @@
-//! Analyzers and Designers for specific plaforms and scheduling algorithms.
+//! Analyzers for specific plaforms and scheduling algorithms.
 
 use crate::prelude::*;
 
 pub mod prelude {
     pub use super::{
         Analyzer,
-        Designer,
-        SchedTestResult,
-        SchedTestResults,
     };
-}
-
-/// Schedulability Results for a single test of a given analyzer
-pub struct SchedTestResult {
-    pub test_name: &'static str,
-    pub result: SchedResult<()>,
-}
-
-/// Schedulability Results for a set of tests of a given analyzer
-pub struct SchedTestResults {
-    pub schedulable: bool,
-    pub results: Vec<SchedTestResult>,
-}
-
-impl std::ops::Deref for SchedTestResults {
-    type Target = bool;
-
-    fn deref(&self) -> &Self::Target {
-        &self.schedulable
-    }
 }
 
 /// Common trait shared across all schedulability analyzers.
@@ -38,7 +15,7 @@ impl std::ops::Deref for SchedTestResults {
 /// - `P`: Platform Description
 pub trait Analyzer<T, P> {
     /// verifies if the given `taskset` on the given `platform` is schedulable
-    fn is_schedulable(&self, taskset: &[T], platform: &P, short_circuit: bool) -> SchedTestResults;
+    fn is_schedulable(&self, taskset: &[T], platform: &P, short_circuit: bool) -> Vec<SchedResult<()>>;
 
     /// verifies if the given `taskset` on the given `platform` is schedulable
     /// using the given test. Test names can be queried by calling the
@@ -47,19 +24,7 @@ pub trait Analyzer<T, P> {
 
     /// returns the set of available schedulability tests provided by the
     /// analyzer that can be run through [`is_schedulable_test`]
-    fn available_tests(&self) -> impl Iterator<Item = &'static str>;
-}
-
-/// Common trait shared across all schedulability designers.
-///
-/// ### Generic Parameters
-/// - `T`: Task Model
-/// - `M`: Designer Parameters
-/// - `P`: Platform Description
-pub trait Designer<T, M, P> {
-    /// generates the best `platform` that can execute the given `taskset`. The
-    /// best platform is chosen according to the given `parameters`.
-    fn design(taskset: &[T], parameters: &M) -> anyhow::Result<P>;
+    fn available_tests(&self) -> &[&'static str];
 }
 
 // Fully-Preemptive Model

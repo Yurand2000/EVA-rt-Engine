@@ -26,11 +26,11 @@ const ALGORITHM: &str = "Fixed Priority DM (Audsley 1990)";
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
     if !RTUtils::constrained_deadlines(taskset) {
-        return SchedErrors(ALGORITHM).constrained_deadlines();
+        return SchedResultFactory(ALGORITHM).constrained_deadlines();
     }
 
     if !RTUtils::is_taskset_sorted_by_deadline(taskset) {
-        return SchedErrors(ALGORITHM).deadline_monotonic();
+        return SchedResultFactory(ALGORITHM).deadline_monotonic();
     }
 
     // Equation 8
@@ -56,8 +56,8 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
         });
 
     if schedulable {
-        Ok(())
+        SchedResultFactory(ALGORITHM).schedulable(())
     } else {
-        SchedErrors(ALGORITHM).non_schedulable()
+        SchedResultFactory(ALGORITHM).non_schedulable()
     }
 }
