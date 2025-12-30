@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::algorithms::fully_preemptive::fixed_priority::*;
+use crate::algorithms::full_preemption::uniprocessor::fixed_priority::*;
 use itertools::Itertools;
 
 pub struct Analyzer;
