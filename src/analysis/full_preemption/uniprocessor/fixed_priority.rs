@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::algorithms::*;
+use crate::algorithms::fully_preemptive::fixed_priority::*;
 use itertools::Itertools;
 
 pub struct Analyzer;
@@ -37,16 +37,13 @@ impl crate::analysis::Analyzer<RTTask, ()> for Analyzer {
     }
 
     fn available_tests(&self) -> &[&'static str] {
-        todo!()
+        Self::AVAILABLE_TESTS
     }
-
-    // fn available_tests(&self) -> impl Iterator<Item = &'static str> {
-    //     Self::NAME_TO_TEST_MAP.iter()
-    //         .map(|&(name, _)| name)
-    // }
 }
 
 impl Analyzer {
+    const AVAILABLE_TESTS: &[&'static str] = &Self::make_available_tests();
+
     const NAME_TO_TEST_MAP: &[(&'static str, fn(&[RTTask]) -> SchedResult<()>)] = &[
         ("rm-classic", rate_monotonic73::is_schedulable),
         ("rm-simplified", rate_monotonic73::is_schedulable_simple),
@@ -54,6 +51,18 @@ impl Analyzer {
         ("dm-classic", deadline_monotonic90::is_schedulable),
         ("rta", |t| rta86::is_schedulable(t).discard()),
     ];
+
+    const fn make_available_tests() -> [&'static str; Self::NAME_TO_TEST_MAP.len()] {
+        let mut available_tests = [""; Self::NAME_TO_TEST_MAP.len()];
+        let mut idx = 0;
+
+        while idx < Self::NAME_TO_TEST_MAP.len() {
+            available_tests[idx] = Self::NAME_TO_TEST_MAP[idx].0;
+            idx += 1;
+        }
+
+        available_tests
+    }
 
     fn get_test(test_name: &str) -> &fn(&[RTTask]) -> SchedResult<()> {
         Self::NAME_TO_TEST_MAP.iter()

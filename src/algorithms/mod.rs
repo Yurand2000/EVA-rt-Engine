@@ -11,10 +11,14 @@ pub mod prelude {
 
 // Single Processor scheduling
 // Fully Preemptive Fixed Priority
-pub mod rate_monotonic73;
-pub mod deadline_monotonic90;
-pub mod rta86;
-pub mod hyperbolic01;
+pub mod fully_preemptive {
+    pub mod fixed_priority {
+        pub mod rate_monotonic73;
+        pub mod deadline_monotonic90;
+        pub mod rta86;
+        pub mod hyperbolic01;
+    }
+}
 
 pub mod up_earliest_deadline_first;
 
