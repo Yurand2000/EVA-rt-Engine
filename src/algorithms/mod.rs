@@ -23,7 +23,7 @@ pub mod full_preemption {
         }
 
         pub mod hierarchical {
-
+            pub mod pr_model03;
         }
     }
 
