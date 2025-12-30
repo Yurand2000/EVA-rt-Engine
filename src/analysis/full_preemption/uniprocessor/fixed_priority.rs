@@ -49,7 +49,7 @@ impl Analyzer {
         ("rm-simplified", rate_monotonic73::is_schedulable_simple),
         ("rm-hyperbolic", hyperbolic01::is_schedulable),
         ("dm-classic", deadline_monotonic90::is_schedulable),
-        ("rta", |t| rta86::is_schedulable(t).discard()),
+        ("rta", |t| rta86::is_schedulable(t).map(|_| ())),
     ];
 
     const fn make_available_tests() -> [&'static str; Self::NAME_TO_TEST_MAP.len()] {

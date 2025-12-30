@@ -72,10 +72,18 @@ pub struct SchedResult<T> {
 }
 
 impl<T> SchedResult<T> {
+    /// Check if the schedulability test passed.
+    ///
+    /// *WARNING*: by negating this result it does not necessarily mean that the
+    /// taskset did satisfy all the precondition of the run schedulability test.
+    /// Use [is_not_schedulable](`Self::is_not_schedulable`)/[] or do a patten
+    /// matching on the result to check if all the preconditions were satisfied
+    /// but the test failed.
     pub fn is_schedulable(&self) -> bool {
         self.result.is_ok()
     }
 
+    /// Check if the schedulability test failed (but all preconditions were satisfied).
     pub fn is_not_schedulable(&self) -> bool {
         match self.result {
             Err(SchedError::NonSchedulable(_)) => true,
@@ -83,6 +91,7 @@ impl<T> SchedResult<T> {
         }
     }
 
+    /// Check if the schedulability test couldn't be run because of an unsatisfied precondition.
     pub fn is_precondition_error(&self) -> bool {
         match self.result {
             Err(SchedError::Precondition(_)) => true,
@@ -90,6 +99,7 @@ impl<T> SchedResult<T> {
         }
     }
 
+    /// Check if there was another error in the execution of the schedulability test.
     pub fn is_other_error(&self) -> bool {
         match self.result {
             Err(SchedError::Other(_)) => true,
@@ -97,8 +107,10 @@ impl<T> SchedResult<T> {
         }
     }
 
-    pub fn discard(self) -> SchedResult<()> {
-        SchedResult { test_name: self.test_name, result: self.result.map(|_| ()) }
+    pub fn map<U, F>(self, op: F) -> SchedResult<U>
+        where F: FnOnce(T) -> U
+    {
+        SchedResult { test_name: self.test_name, result: self.result.map(op) }
     }
 }
 
