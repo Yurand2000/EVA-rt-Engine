@@ -29,12 +29,16 @@ pub mod full_preemption {
 
     pub mod global_multiprocessor {
         pub mod earliest_deadline_first {
-
+            pub mod baruah07;
         }
 
         pub mod fixed_priority {
             pub mod deadline_monotonic_bcl05;
             pub mod rta_lc09;
+        }
+
+        pub mod generic_work_conserving {
+
         }
 
         pub mod hierarchical {
