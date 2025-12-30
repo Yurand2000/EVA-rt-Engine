@@ -34,6 +34,7 @@ pub mod full_preemption {
 
         pub mod fixed_priority {
             pub mod deadline_monotonic_bcl05;
+            pub mod rta_lc09;
         }
 
         pub mod hierarchical {
@@ -44,7 +45,6 @@ pub mod full_preemption {
 
 // Multi Processor Global scheduling
 pub mod smp_earliest_deadline_first;
-pub mod smp_fixed_priority;
 pub mod smp_generic;
 
 // Multi Processor Hierarchical scheduling
