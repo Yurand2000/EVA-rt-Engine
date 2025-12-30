@@ -25,7 +25,7 @@ use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Fixed Priority DM (Bertogna, Cirinei, Lipari 2005)";
 
-/// Multiprocessor Fixed Priority DM, Bertogna, Cirinei, Lipari 2005 \[1\]
+/// Multiprocessor Fixed Priority DM - Bertogna, Cirinei, Lipari 2005 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> SchedResult<()> {

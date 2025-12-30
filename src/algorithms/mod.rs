@@ -17,8 +17,8 @@ pub mod full_preemption {
 
         pub mod fixed_priority {
             pub mod rate_monotonic73;
-            pub mod deadline_monotonic90;
             pub mod rta86;
+            pub mod deadline_monotonic90;
             pub mod hyperbolic01;
         }
 
@@ -29,6 +29,9 @@ pub mod full_preemption {
 
     pub mod global_multiprocessor {
         pub mod earliest_deadline_first {
+            pub mod gbf03;
+            pub mod baker03;
+            pub mod bcl05;
             pub mod baruah07;
         }
 
