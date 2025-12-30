@@ -33,29 +33,24 @@ pub mod full_preemption {
             pub mod baker03;
             pub mod bcl05;
             pub mod baruah07;
+            pub mod bcl09;
         }
 
         pub mod fixed_priority {
             pub mod deadline_monotonic_bcl05;
             pub mod rta_lc09;
+            pub mod bcl09;
         }
 
         pub mod generic_work_conserving {
-
+            pub mod bcl09;
         }
 
         pub mod hierarchical {
-
+            pub mod mpr_model09;
         }
     }
 }
-
-// Multi Processor Global scheduling
-pub mod smp_earliest_deadline_first;
-pub mod smp_generic;
-
-// Multi Processor Hierarchical scheduling
-pub mod multiprocessor_periodic_resource_model;
 
 #[derive(Debug, Clone)]
 pub enum Error {
