@@ -22,6 +22,9 @@ use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Multiprocessor FP Response Time Analysis (Guan, Stigge, Yi, Yu 2009)";
 
+/// Multiprocessor FP Response Time Analysis - Guan, Stigge, Yi, Yu 2009 \[1\]
+///
+/// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable(taskset: &[RTTask], cpus: usize) -> SchedResult<()> {
     if !RTUtils::constrained_deadlines(taskset) {
         return SchedResultFactory(ALGORITHM).constrained_deadlines();
