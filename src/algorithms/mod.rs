@@ -9,8 +9,6 @@ pub mod prelude {
     };
 }
 
-// Single Processor scheduling
-// Fully Preemptive Fixed Priority
 pub mod full_preemption {
     pub mod uniprocessor {
         pub mod earliest_deadline_first {
@@ -23,18 +21,31 @@ pub mod full_preemption {
             pub mod rta86;
             pub mod hyperbolic01;
         }
+
+        pub mod hierarchical {
+
+        }
+    }
+
+    pub mod global_multiprocessor {
+        pub mod earliest_deadline_first {
+
+        }
+
+        pub mod fixed_priority {
+            pub mod deadline_monotonic_bcl05;
+        }
+
+        pub mod hierarchical {
+
+        }
     }
 }
-
-// Single Processor Hierarchical scheduling
-// Fully Preemptive Fixed Priority
 
 // Multi Processor Global scheduling
 pub mod smp_earliest_deadline_first;
 pub mod smp_fixed_priority;
 pub mod smp_generic;
-
-// Multi Processor Partitioned scheduling
 
 // Multi Processor Hierarchical scheduling
 pub mod multiprocessor_periodic_resource_model;

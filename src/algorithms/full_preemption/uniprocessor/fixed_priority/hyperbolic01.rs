@@ -41,9 +41,6 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
         .map(|task| task.utilization() + 1f64)
         .product();
 
-    if bound <= 2f64 {
-        SchedResultFactory(ALGORITHM).schedulable(())
-    } else {
-        SchedResultFactory(ALGORITHM).non_schedulable()
-    }
+    SchedResultFactory(ALGORITHM)
+        .is_schedulable(bound <= 2f64)
 }

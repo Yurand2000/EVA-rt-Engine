@@ -43,11 +43,8 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
     let rate_monotonic_lub =
         (taskset.len() as f64) * (f64::powf(2.0, 1.0 / taskset.len() as f64) - 1.0);
 
-    if total_utilization <= rate_monotonic_lub {
-        SchedResultFactory(ALGORITHM).schedulable(())
-    } else {
-        SchedResultFactory(ALGORITHM).non_schedulable()
-    }
+    SchedResultFactory(ALGORITHM)
+        .is_schedulable(total_utilization <= rate_monotonic_lub)
 }
 
 /// Fixed Priority Rate Monotonic, Liu & Layland 1973 \[1\]
@@ -71,9 +68,6 @@ pub fn is_schedulable_simple(taskset: &[RTTask]) -> SchedResult<()> {
     //   forall a>0. lim x->0 ((a^x - 1) / x) = ln(a)
     let rate_monotonic_lub = f64::ln(2f64);
 
-    if total_utilization <= rate_monotonic_lub {
-        SchedResultFactory(ALGORITHM).schedulable(())
-    } else {
-        SchedResultFactory(ALGORITHM).non_schedulable()
-    }
+    SchedResultFactory(ALGORITHM)
+        .is_schedulable(total_utilization <= rate_monotonic_lub)
 }

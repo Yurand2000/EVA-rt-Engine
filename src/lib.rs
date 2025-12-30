@@ -129,6 +129,14 @@ impl<T> std::fmt::Display for SchedResult<T> {
 pub struct SchedResultFactory<'a>(&'a str);
 
 impl<'a> SchedResultFactory<'a> {
+    pub fn is_schedulable(self, is_schedulable: bool) -> SchedResult<()> {
+        if is_schedulable {
+            self.schedulable(())
+        } else {
+            self.non_schedulable()
+        }
+    }
+
     pub fn schedulable<T>(self, result: T) -> SchedResult<T> {
         SchedResult {
             test_name: self.0.to_owned(),

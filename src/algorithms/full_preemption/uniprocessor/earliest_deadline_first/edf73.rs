@@ -32,9 +32,6 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
 
     let total_utilization = RTUtils::total_utilization(taskset);
 
-    if total_utilization <= 1f64 {
-        SchedResultFactory(ALGORITHM).schedulable(())
-    } else {
-        SchedResultFactory(ALGORITHM).non_schedulable()
-    }
+    SchedResultFactory(ALGORITHM)
+        .is_schedulable(total_utilization <= 1f64)
 }

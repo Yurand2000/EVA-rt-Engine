@@ -55,9 +55,5 @@ pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
             task.wcet + interference(&taskset[0..=i]) <= task.deadline
         });
 
-    if schedulable {
-        SchedResultFactory(ALGORITHM).schedulable(())
-    } else {
-        SchedResultFactory(ALGORITHM).non_schedulable()
-    }
+    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
 }
