@@ -9,7 +9,11 @@
 //!
 //! #### Implements:
 //! - [`is_schedulable`] \
-//!   | pseudo-polynomial complexity \
+//!   | pseudo-polynomial complexity
+//! - [`generate_model_linear`] \
+//!   | Generate the suitable interface given the taskset and the [`PRModel`]'s period. \
+//!   | \
+//!   | O(*n*) complexity
 //!
 //! ---
 //! #### References:
@@ -31,16 +35,7 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Ti
         return SchedResultFactory(ALGORITHM).constrained_deadlines();
     }
 
-    // Equation 10 [1]
-    fn rta(taskset: &[RTTask], k: usize, task_k: &RTTask, response: Time) -> Time {
-        taskset.iter()
-            .take(k - 1)
-            .map(|task_i| (response / task_i.period).ceil() * task_i.wcet)
-            .sum::<Time>()
-        +
-            task_k.wcet
-    }
-
+    // Equation 14 [1]
     let result =
         is_schedulable_response(
             taskset,
@@ -52,4 +47,30 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Ti
         test_name: ALGORITHM.to_owned(),
         result: result.map_err(|err| SchedError::NonSchedulable(Some(err))),
     }
+}
+
+/// Periodic Resource Model, EDF Local Scheduling - Shin & Lee 2003 \[1\] \
+/// Derive the best [`PRModel`] using demand analysis.
+///
+/// Refer to the [module](`self`) level documentation.
+pub fn generate_model_linear(taskset: &[RTTask], model_period: Time) -> DesignResult<PRModel> {
+    // Equations 23, 24 [1]
+    let model =
+        generate_model_from_response_linear(
+            taskset,
+            model_period,
+            rta
+        );
+
+    DesignResultFactory(ALGORITHM).from_option(model)
+}
+
+// Equation 10 [1]
+fn rta(taskset: &[RTTask], k: usize, task_k: &RTTask, response: Time) -> Time {
+    taskset.iter()
+        .take(k - 1)
+        .map(|task_i| (response / task_i.period).ceil() * task_i.wcet)
+        .sum::<Time>()
+    +
+        task_k.wcet
 }

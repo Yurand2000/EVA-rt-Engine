@@ -18,14 +18,14 @@
 //!   | \
 //!   | pseudo-polynomial complexity \
 //!   | (depends on the rate of convergence of the RTA analysis)
-//! - [`generate_model_demand_linear`] \
+//! - [`generate_model_from_demand_linear`] \
 //!   | Generic implementation for deriving the appropriate PRModel for a given
 //!     taskset and model's period using demand analysis. Uses the linear
 //!     approximation functions to derive the resource requirements. \
 //!   | \
 //!   | O(*demand_fn*) \* O(*time_intervals*) complexity. \
 //!   | pseudo-polynomial if the number time intervals to check depends on the taskset.
-//! - [`generate_model_response_linear`] \
+//! - [`generate_model_from_response_linear`] \
 //!   | Generic implementation for deriving the appropriate PRModel for a given
 //!     taskset and model's period using response time analysis. Uses the linear
 //!     approximation functions to derive the resource requirements. \
@@ -169,7 +169,7 @@ pub fn is_schedulable_response<FRTA>(
 /// Generic implementation generating the best [`PRModel`] using demand analysis.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn generate_model_demand_linear<FDem, FTime>(
+pub fn generate_model_from_demand_linear<FDem, FTime>(
     taskset: &[RTTask],
     model_period: Time,
     demand_fn: FDem,
@@ -205,7 +205,7 @@ pub fn generate_model_demand_linear<FDem, FTime>(
 /// Generic implementation generating the best [`PRModel`] using response time analysis.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn generate_model_response_linear<FRTA>(
+pub fn generate_model_from_response_linear<FRTA>(
     taskset: &[RTTask],
     model_period: Time,
     rta_fn: FRTA,
