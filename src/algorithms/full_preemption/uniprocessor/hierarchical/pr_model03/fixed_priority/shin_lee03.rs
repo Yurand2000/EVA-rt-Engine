@@ -5,7 +5,7 @@
 //! - Fully-Preemptive Fixed Priority scheduling
 //!
 //! #### Preconditions:
-//! - Implicit Deadlines
+//! - Constrained Deadlines
 //!
 //! #### Implements:
 //! - [`is_schedulable`] \
@@ -27,12 +27,8 @@ const ALGORITHM: &str = "Periodic Resource Model, Fixed Priority Local Schedulin
 ///
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Time>> {
-    if !RTUtils::is_taskset_sorted_by_period(taskset) {
-        return SchedResultFactory(ALGORITHM).rate_monotonic();
-    }
-
-    if !RTUtils::implicit_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).implicit_deadlines();
+    if !RTUtils::constrained_deadlines(taskset) {
+        return SchedResultFactory(ALGORITHM).constrained_deadlines();
     }
 
     // Equation 10 [1]

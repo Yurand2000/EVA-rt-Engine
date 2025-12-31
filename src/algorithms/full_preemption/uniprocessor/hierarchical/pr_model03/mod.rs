@@ -112,6 +112,9 @@ pub fn is_schedulable_demand<FDem, FTime>(
 /// Periodic Resource Model - Shin & Lee 2003 \[1\] \
 /// Generic implementation for response time based analysis.
 ///
+/// Note: The response time analysis `rta_fn` function must be a **monotone**
+/// function to guarantee that the computation terminates.
+///
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable_response<FRTA>(
     test_name: &str,
