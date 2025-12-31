@@ -48,11 +48,13 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<()> {
         )
     }
 
-    is_schedulable_demand(
-        ALGORITHM,
-        taskset,
-        model,
-        demand,
-        time_intervals
-    )
+    let schedulable =
+        is_schedulable_demand(
+            taskset,
+            model,
+            demand,
+            time_intervals
+        );
+
+    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
 }

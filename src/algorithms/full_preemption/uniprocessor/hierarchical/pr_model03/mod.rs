@@ -18,6 +18,19 @@
 //!   | \
 //!   | pseudo-polynomial complexity \
 //!   | (depends on the rate of convergence of the RTA analysis)
+//! - [`generate_model_demand_linear`] \
+//!   | Generic implementation for deriving the appropriate PRModel for a given
+//!     taskset and model's period using demand analysis. Uses the linear
+//!     approximation functions to derive the resource requirements. \
+//!   | \
+//!   | O(*demand_fn*) \* O(*time_intervals*) complexity. \
+//!   | pseudo-polynomial if the number time intervals to check depends on the taskset.
+//! - [`generate_model_response_linear`] \
+//!   | Generic implementation for deriving the appropriate PRModel for a given
+//!     taskset and model's period using response time analysis. Uses the linear
+//!     approximation functions to derive the resource requirements. \
+//!   | \
+//!   | O(*n*) * O(rta_fn) complexity
 //!
 //! ---
 //! #### References:
@@ -65,7 +78,7 @@ impl PRModel {
         Time::max(interval - 2.0 * diff - self.period * base, Time::zero())
     }
 
-    pub fn get_linear_supply(&self, interval: Time) -> Time {
+    pub fn get_supply_linear(&self, interval: Time) -> Time {
         // Lemma 1 [1]
         self.capacity() * (interval - 2.0 * (self.period - self.resource))
     }
@@ -79,9 +92,19 @@ impl PRModel {
         Time::max(diff + supply - self.resource * (supply / self.resource), Time::zero())
     }
 
-    pub fn get_linear_interval_from_supply(&self, supply: Time) -> Time {
+    pub fn get_interval_from_supply_linear(&self, supply: Time) -> Time {
         // Lemma 2 [1]
         (self.period / self.resource) * supply + 2.0 * (self.period - self.resource)
+    }
+
+    /// Gets the resource necessary to provide a given supply in the given interval.
+    ///
+    /// Inverts [`PRModel::get_linear_supply`] on the resource field of the [`PRModel`]
+    /// or equivalently inverts [`PRModel::get_linear_interval_from_supply`].
+    pub fn get_resource_linear(supply: Time, interval: Time, period: Time) -> Time {
+        let b = interval - 2.0 * period;
+
+        (- b + Time2::sqrt(b * b + 8.0 * period * supply)) / 4.0
     }
 }
 
@@ -90,23 +113,20 @@ impl PRModel {
 ///
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable_demand<FDem, FTime>(
-    test_name: &str,
     taskset: &[RTTask],
     model: &PRModel,
     demand_fn: FDem,
     time_intervals_fn: FTime,
-) -> SchedResult<()>
+) -> bool
     where
         FDem: Fn(&[RTTask], Time) -> Time,
         FTime: Fn(&[RTTask]) -> Box<dyn Iterator<Item = Time>>,
 {
     let mut time_intervals = time_intervals_fn(taskset);
 
-    let schedulable = time_intervals.all(|time|
+    time_intervals.all(|time|
         demand_fn(taskset, time) <= model.get_supply(time)
-    );
-
-    SchedResultFactory(test_name).is_schedulable(schedulable)
+    )
 }
 
 /// Periodic Resource Model - Shin & Lee 2003 \[1\] \
@@ -117,39 +137,98 @@ pub fn is_schedulable_demand<FDem, FTime>(
 ///
 /// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable_response<FRTA>(
-    test_name: &str,
     taskset: &[RTTask],
     model: &PRModel,
     rta_fn: FRTA,
-) -> SchedResult<Vec<Time>>
+) -> Result<Vec<Time>, anyhow::Error>
     where
         FRTA: Fn(&[RTTask], usize, &RTTask, Time) -> Time,
 {
-    let schedulable: Result<Vec<Time>, usize> =
-        taskset.iter().enumerate()
+    taskset.iter().enumerate()
         .map(|(k, task_k)| {
-            let mut response = task_k.wcet;
+            let response =
+                fixpoint_search_with_limit(
+                    task_k.wcet,
+                    task_k.deadline,
+                    |response: &Time|
+                        model.get_interval_from_supply(
+                            rta_fn(taskset, k, task_k, *response)
+                        )
+                );
 
-            loop {
-                let new_response =
-                    model.get_interval_from_supply(
-                        rta_fn(taskset, k, task_k, response)
-                    );
-
-                if new_response > task_k.deadline {
-                    return Err(k);
-                } else if new_response == response {
-                    return Ok(new_response);
-                }
-
-                response = new_response;
+            if response > task_k.deadline {
+                return Err(anyhow::format_err!("Response time of task {k} is greater than its deadline."));
+            } else {
+                return Ok(response);
             }
         })
-        .collect();
+        .collect()
+}
 
-    match schedulable {
-        Ok(respose_times) => SchedResultFactory(test_name).schedulable(respose_times),
-        Err(k) => SchedResultFactory(test_name).non_schedulable_reason(
-            anyhow::format_err!("Response time of task {k} is greater than its deadline.")),
+/// Periodic Resource Model - Shin & Lee 2003 \[1\] \
+/// Generic implementation generating the best [`PRModel`] using demand analysis.
+///
+/// Refer to the [module](`self`) level documentation.
+pub fn generate_model_demand_linear<FDem, FTime>(
+    taskset: &[RTTask],
+    model_period: Time,
+    demand_fn: FDem,
+    time_intervals_fn: FTime,
+) -> Option<PRModel>
+    where
+        FDem: Fn(&[RTTask], Time) -> Time,
+        FTime: Fn(&[RTTask]) -> Box<dyn Iterator<Item = Time>>,
+{
+    let time_intervals = time_intervals_fn(taskset);
+
+    let min_resource =
+        time_intervals
+        .map(|time| {
+            let supply = demand_fn(taskset, time);
+            PRModel::get_resource_linear(supply, time, model_period)
+        })
+        .max()?;
+
+    let model = PRModel {
+        resource: min_resource,
+        period: model_period,
+    };
+
+    if model.is_feasible() {
+        Some(model)
+    } else {
+        None
+    }
+}
+
+/// Periodic Resource Model - Shin & Lee 2003 \[1\] \
+/// Generic implementation generating the best [`PRModel`] using response time analysis.
+///
+/// Refer to the [module](`self`) level documentation.
+pub fn generate_model_response_linear<FRTA>(
+    taskset: &[RTTask],
+    model_period: Time,
+    rta_fn: FRTA,
+) -> Option<PRModel>
+    where
+        FRTA: Fn(&[RTTask], usize, &RTTask, Time) -> Time,
+{
+    let min_resource =
+        taskset.iter().enumerate()
+        .map(|(k, task_k)| {
+            let supply = rta_fn(taskset, k, task_k, task_k.period);
+            PRModel::get_resource_linear(supply, task_k.period, model_period)
+        })
+        .max()?;
+
+    let model = PRModel {
+        resource: min_resource,
+        period: model_period,
+    };
+
+    if model.is_feasible() {
+        Some(model)
+    } else {
+        None
     }
 }

@@ -41,10 +41,15 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Ti
             task_k.wcet
     }
 
-    is_schedulable_response(
-        ALGORITHM,
-        taskset,
-        model,
-        rta,
-    )
+    let result =
+        is_schedulable_response(
+            taskset,
+            model,
+            rta,
+        );
+
+    SchedResult {
+        test_name: ALGORITHM.to_owned(),
+        result: result.map_err(|err| SchedError::NonSchedulable(Some(err))),
+    }
 }
