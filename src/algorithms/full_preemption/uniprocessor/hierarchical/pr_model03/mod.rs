@@ -1,10 +1,23 @@
 //! ## Periodic Resource Model - Shin & Lee 2003
 //!
+//! Generic implementation for demand based analysis and response based analysis
+//! for the Periodic Resource model. Can supply custom functions/formulas to
+//! derive schedulability analyses for scheduling algorithms other than EDF and
+//! Fixed Priority.
+//!
 //! #### Implements:
+//! - [`PRModel`] \
+//!   | Periodic Resource Model
 //! - [`is_schedulable_demand`] \
-//!   | pseudo-polynomial complexity
+//!   | Generic implementation for demand based analysis. \
+//!   | \
+//!   | O(*demand_fn*) \* O(*time_intervals*) complexity. \
+//!   | pseudo-polynomial if the number time intervals to check depends on the taskset.
 //! - [`is_schedulable_response`] \
-//!   | pseudo-polynomial complexity
+//!   | Generic implementation for response time based analysis. \
+//!   | \
+//!   | pseudo-polynomial complexity \
+//!   | (depends on the rate of convergence of the RTA analysis)
 //!
 //! ---
 //! #### References:
@@ -14,6 +27,19 @@
 
 use crate::prelude::*;
 
+// Local Scheduling Algorithms
+pub mod earliest_deadline_first {
+    pub mod shin_lee03;
+}
+
+pub mod fixed_priority {
+    pub mod shin_lee03;
+}
+
+/// Periodic Resource Model - Shin & Lee 2003 \[1\]
+///
+/// Refer to the [module](`self`) level documentation.
+#[derive(Debug, Clone)]
 pub struct PRModel {
     pub resource: Time,
     pub period: Time,
@@ -28,8 +54,8 @@ impl PRModel {
         self.resource / self.period
     }
 
-    // Equation 1
     pub fn get_supply(&self, interval: Time) -> Time {
+        // Equation 1 [1]
         let diff = self.period - self.resource;
 
         let base = ((interval - diff) / self.period).floor();
@@ -39,13 +65,13 @@ impl PRModel {
         Time::max(interval - 2.0 * diff - self.period * base, Time::zero())
     }
 
-    // Lemma 1
     pub fn get_linear_supply(&self, interval: Time) -> Time {
+        // Lemma 1 [1]
         self.capacity() * (interval - 2.0 * (self.period - self.resource))
     }
 
-    // Equation 6, 7
     pub fn get_interval_from_supply(&self, supply: Time) -> Time {
+        // Equation 6, 7 [1]
         let diff = self.period - self.resource;
 
         diff + self.period * (supply / self.resource).floor()
@@ -53,31 +79,40 @@ impl PRModel {
         Time::max(diff + supply - self.resource * (supply / self.resource), Time::zero())
     }
 
-    // Lemma 2
     pub fn get_linear_interval_from_supply(&self, supply: Time) -> Time {
+        // Lemma 2 [1]
         (self.period / self.resource) * supply + 2.0 * (self.period - self.resource)
     }
 }
 
-pub fn is_schedulable_demand<FDem>(
+/// Periodic Resource Model - Shin & Lee 2003 \[1\] \
+/// Generic implementation for demand based analysis.
+///
+/// Refer to the [module](`self`) level documentation.
+pub fn is_schedulable_demand<FDem, FTime>(
     test_name: &str,
     taskset: &[RTTask],
     model: &PRModel,
     demand_fn: FDem,
+    time_intervals_fn: FTime,
 ) -> SchedResult<()>
     where
         FDem: Fn(&[RTTask], Time) -> Time,
+        FTime: Fn(&[RTTask]) -> Box<dyn Iterator<Item = Time>>,
 {
-    let max_time = 2.0 * RTUtils::hyperperiod(taskset);
+    let mut time_intervals = time_intervals_fn(taskset);
 
-    let schedulable =
-        (0 ..= max_time.as_nanos() as u64)
-        .map(|time| Time::nanos(time as f64))
-        .all(|time| demand_fn(taskset, time) <= model.get_supply(time) );
+    let schedulable = time_intervals.all(|time|
+        demand_fn(taskset, time) <= model.get_supply(time)
+    );
 
     SchedResultFactory(test_name).is_schedulable(schedulable)
 }
 
+/// Periodic Resource Model - Shin & Lee 2003 \[1\] \
+/// Generic implementation for response time based analysis.
+///
+/// Refer to the [module](`self`) level documentation.
 pub fn is_schedulable_response<FRTA>(
     test_name: &str,
     taskset: &[RTTask],
