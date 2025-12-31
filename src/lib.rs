@@ -24,6 +24,7 @@ pub mod prelude {
     };
     pub use super::{
         fixpoint_search_with_limit,
+        binary_search_fn,
     };
 }
 
@@ -41,11 +42,11 @@ pub mod utils {
 pub fn fixpoint_search_with_limit<T, F>(
     init: T,
     limit: T,
-    fun: F
+    mut fun: F
 ) -> T
     where
         T: PartialOrd + PartialEq,
-        F: Fn(&T) -> T,
+        F: FnMut(&T) -> T,
 {
     let mut value = init;
 
@@ -59,5 +60,33 @@ pub fn fixpoint_search_with_limit<T, F>(
         }
 
         value = new_value;
+    }
+}
+
+pub fn binary_search_fn<T, FVal, FCmp>(
+    (mut left, mut right): (usize, usize),
+    mut fun: FVal,
+    mut cmp: FCmp
+) -> T
+    where
+        FVal: FnMut(usize) -> T,
+        FCmp: FnMut(&T) -> std::cmp::Ordering,
+{
+    use std::cmp::Ordering::*;
+
+    assert!(left <= right);
+
+    loop {
+        let mid = left + (right - left) / 2;
+        let mid_value = fun(mid);
+
+        match cmp(&mid_value) {
+            Less | Equal => { left = mid + 1; },
+            Greater => { right = mid; },
+        }
+
+        if left >= right {
+            return mid_value;
+        }
     }
 }

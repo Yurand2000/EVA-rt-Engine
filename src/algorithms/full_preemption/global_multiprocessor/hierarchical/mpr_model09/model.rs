@@ -73,7 +73,7 @@ impl MPRModel {
     }
 
     /// Get the resource of the model which provides the given (linear) supply in the given time interval.
-    pub fn resource_from_linear_supply(lsbf: Time, interval: Time, period: Time, concurrency: u64) -> Time {
+    pub fn resource_from_supply_linear(lsbf: Time, interval: Time, period: Time, concurrency: u64) -> Time {
         // Note that this only works for positive values of the linear supply bound.
         // There is only one positive solution for a positive bound, but two
         // solutions or zero for a negative one.
@@ -98,14 +98,14 @@ impl MPRModelSpecification {
     }
 
     /// Get the resource of the model which provides the given (linear) supply in the given time interval.
-    pub fn resource_from_linear_supply(&self, lsbf: Time, interval: Time) -> Time {
-        MPRModel::resource_from_linear_supply(lsbf, interval, self.period, self.concurrency)
+    pub fn resource_from_supply_linear(&self, lsbf: Time, interval: Time) -> Time {
+        MPRModel::resource_from_supply_linear(lsbf, interval, self.period, self.concurrency)
     }
 
     /// Get the model which provides the given (linear) supply in the given time interval.
     pub fn model_from_linear_supply(&self, lsbf: Time, interval: Time) -> MPRModel {
         MPRModel {
-            resource: self.resource_from_linear_supply(lsbf, interval),
+            resource: self.resource_from_supply_linear(lsbf, interval),
             period: self.period,
             concurrency: self.concurrency,
         }

@@ -115,12 +115,12 @@ impl PRModel {
 pub fn is_schedulable_demand<FDem, FTime>(
     taskset: &[RTTask],
     model: &PRModel,
-    demand_fn: FDem,
-    time_intervals_fn: FTime,
+    mut demand_fn: FDem,
+    mut time_intervals_fn: FTime,
 ) -> bool
     where
-        FDem: Fn(&[RTTask], Time) -> Time,
-        FTime: Fn(&[RTTask]) -> Box<dyn Iterator<Item = Time>>,
+        FDem: FnMut(&[RTTask], Time) -> Time,
+        FTime: FnMut(&[RTTask]) -> Box<dyn Iterator<Item = Time>>,
 {
     let mut time_intervals = time_intervals_fn(taskset);
 
@@ -139,10 +139,10 @@ pub fn is_schedulable_demand<FDem, FTime>(
 pub fn is_schedulable_response<FRTA>(
     taskset: &[RTTask],
     model: &PRModel,
-    rta_fn: FRTA,
+    mut rta_fn: FRTA,
 ) -> Result<Vec<Time>, anyhow::Error>
     where
-        FRTA: Fn(&[RTTask], usize, &RTTask, Time) -> Time,
+        FRTA: FnMut(&[RTTask], usize, &RTTask, Time) -> Time,
 {
     taskset.iter().enumerate()
         .map(|(k, task_k)| {

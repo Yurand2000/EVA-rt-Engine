@@ -36,51 +36,6 @@ use super::{
 
 // -----------------------------------------------------------------------------
 
-/// Multiprocessor Periodic Resource Model - Shin, Easwaran, Lee 2009
-///
-/// Generic implementation for the MPRModel schedulability test.
-/// Requires:
-/// - A demand function, which describes the workload demand of the taskset at a given timepoint.
-/// - A function which provides the set of arrival times of a task to check.
-///
-/// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable<FDem, FAk>(
-    test_name: &str,
-    taskset: &[RTTask],
-    model: &MPRModel,
-    demand_fn: FDem,
-    arrival_times_fn: FAk,
-) -> SchedResult<()>
-    where
-        FDem: Fn(&[RTTask], usize, &RTTask, &MPRModel, Time) -> Result<Time, SchedError>,
-        FAk: Fn(&[RTTask], usize, &RTTask, &MPRModel) -> Result<Box<dyn Iterator<Item = Time>>, SchedError>,
-{
-    for (k, task_k) in taskset.iter().enumerate() {
-        let arrival_times_iter =
-            match arrival_times_fn(taskset, k, task_k, model) {
-                Ok(iter) => iter,
-                Err(err) => return SchedResultFactory(test_name).from_err(err),
-            };
-
-        for arrival_k in arrival_times_iter {
-            let demand =
-                match demand_fn(taskset, k, task_k, model, arrival_k) {
-                    Ok(demand) => demand,
-                    Err(err) => return SchedResultFactory(test_name).from_err(err),
-                };
-
-            let supply =
-                model.get_supply(arrival_k + task_k.deadline);
-
-            if demand > supply {
-                return SchedResultFactory(test_name).non_schedulable();
-            }
-        }
-    }
-
-    SchedResultFactory(test_name).schedulable(())
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum GenerationStrategy {
     Naive,

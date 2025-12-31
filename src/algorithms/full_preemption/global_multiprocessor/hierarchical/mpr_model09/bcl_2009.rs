@@ -51,7 +51,7 @@ pub fn generate_interface_global_edf_simple(taskset: &[RTTask], period: Time, st
                         |taskset, k, task_k, model, _|
                             demand_edf(taskset, k, task_k, model.concurrency),
                         |demand, interval, model|
-                            MPRModel::resource_from_linear_supply(demand, interval, model.period, model.concurrency),
+                            MPRModel::resource_from_supply_linear(demand, interval, model.period, model.concurrency),
                         |_, _, _, _| Ok(Time::zero()),
                         |_, _, _, _, _| true,
                     ),
@@ -105,7 +105,7 @@ pub fn generate_interface_global_fp(taskset: &[RTTask], period: Time, step_size:
                         |taskset, k, task_k, model, _|
                             demand_fp(taskset, k, task_k, model.concurrency),
                         |demand, interval, model|
-                            MPRModel::resource_from_linear_supply(demand, interval, model.period, model.concurrency),
+                            MPRModel::resource_from_supply_linear(demand, interval, model.period, model.concurrency),
                         |_, _, _, _| Ok(Time::zero()),
                         |_, _, _, _, _| true,
                     ),
