@@ -1,21 +1,12 @@
 //! ## Multiprocessor Periodic Resource Model - Shin, Easwaran, Lee 2009
 //!
-//! #### Model:
-//! - Periodic/Sporadic Task model
-//! - Fully-Preemptive generic Work Conserving scheduling policy
-//!
-//! #### Preconditions:
-//! - Constrained Deadlines
-//!
 //! #### Implements:
-//! - [`is_schedulable_edf`] \
-//!   | O(*n^2*) complexity
-//! - [`is_schedulable_edf_simple`] \
-//!   | O(*n^2*) complexity
-//! - [`generate_interface_global_edf_simple`] \
-//!   | O(*n^2*) complexity
-//! - [`generate_interface_global_edf`] \
-//!   | O(*n^2*) complexity
+//! - [`MPRModel`] \
+//!   | ??
+//! - [`is_schedulable_demand`] \
+//!   | ?? complexity
+//! - [`generate_model_from_demand_linear`] \
+//!   | ?? complexity
 //!
 //! ---
 //! #### References:
@@ -31,17 +22,131 @@ use crate::prelude::*;
 // Local Scheduling Algorithms
 pub mod earliest_deadline_first {
     pub mod shin_easwaran_lee09;
+    pub mod bcl09;
 }
 
 pub mod fixed_priority {
     pub mod bcl09;
 }
 
-pub mod bcl_2009;
-pub mod generic;
-pub mod model;
+// Section 3.2 [1]
+#[derive(Debug, Clone)]
+pub struct MPRModel {
+    pub resource: Time,
+    pub period: Time,
+    pub concurrency: u64,
+}
 
-use model::*;
+impl MPRModel {
+    pub fn is_feasible(&self) -> bool {
+        self.resource <= self.concurrency as f64 * self.period
+    }
+
+    /// resource / period
+    pub fn utilization(&self) -> f64 {
+        self.resource / self.period
+    }
+
+    /// Get the total supply the model provides in the given time interval.
+    pub fn get_supply(&self, interval: Time) -> Time {
+        // Definition 1 [2]
+        // Supply Bound Function for a MPRModel
+        let m = self.concurrency as f64;
+        let a = Time::floor(self.resource / m);
+        let b = self.resource - m * a;
+        let t1 = interval - (self.period - Time::ceil(self.resource / m));
+        let x = t1 - self.period * f64::floor(t1 / self.period);
+        let y = self.period - a;
+
+        if t1 < Time::zero() {
+            Time::zero()
+        } else {
+            f64::floor(t1 / self.period) * self.resource
+                +
+            Time::max(Time::zero(), m*x - m*self.period + self.resource)
+                -
+            if x >= Time::one() && x < y {
+                Time::zero()
+            } else {
+                Time::nanos(m) - b
+            }
+        }
+    }
+
+    /// Get the total supply the model provides in the given time interval (linear version).
+    ///
+    /// Note: for_all time. linear_supply(model, time) <= supply(model, time)
+    pub fn get_supply_linear(&self, interval: Time) -> Time {
+        let (resource, period, concurrency) = (self.resource, self.period, self.concurrency);
+
+        // Equation 2 [2]
+        resource / period * (interval - 2.0 * (period - resource / concurrency as f64) + Time::nanos(2.0))
+    }
+
+    /// Get the resource of the model which provides the given (linear) supply in the given time interval.
+    pub fn resource_from_supply_linear(lsbf: Time, interval: Time, period: Time, concurrency: u64) -> Time {
+        // Note that this only works for positive values of the linear supply bound.
+        // There is only one positive solution for a positive bound, but two
+        // solutions or zero for a negative one.
+        debug_assert!(lsbf >= Time::zero());
+
+        let cpus = concurrency as f64;
+        let negb = 2.0 * period - interval + Time::nanos(2.0);
+        let bsqr = negb * negb;
+
+        // Extracted Theta from Equation 2 [2]
+        cpus * (negb + Time2::sqrt(bsqr + 8.0 * period * lsbf / cpus) ) / 4.0
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Convert each MPRModel to a set of periodic tasks (with implicit deadline)
+// that represent the high-level requirements for the scheduled taskset. This
+// set of server tasks can be scheduled with uniprocessor algorithms, as they
+// are meant to be pinned to invididual CPUs.
+impl MPRModel {
+    // Section 5.2, Definition 1 [1]
+    pub fn to_periodic_tasks(&self) -> Vec<RTTask> {
+        #[inline(always)]
+        fn psi(model: &MPRModel) -> Time {
+            model.resource - model.concurrency as f64 *
+                (model.resource / model.concurrency as f64).floor()
+        }
+
+        let k = psi(&self).as_nanos();
+
+        (0..self.concurrency)
+            .map(|i| {
+                let wcet =
+                    if i <= k as u64 {
+                        (self.resource / self.concurrency as f64).floor() + Time::one()
+                    } else if i == k as u64 + 1 {
+                        (self.resource / self.concurrency as f64).floor()
+                            + psi(&self) - k * (psi(&self) / k).floor()
+                    } else {
+                        (self.resource / self.concurrency as f64).floor()
+                    };
+
+                RTTask {
+                    wcet: wcet,
+                    deadline: self.period,
+                    period: self.period,
+                }
+            })
+            .collect()
+    }
+
+    pub fn to_periodic_tasks_simple(&self) -> (RTTask, u64) {
+        let task =
+            RTTask {
+                wcet: (self.resource / self.concurrency as f64).floor() + Time::one(),
+                deadline: self.period,
+                period: self.period,
+            };
+
+        (task, self.concurrency)
+    }
+}
 
 /// Multiprocessor Periodic Resource Model - Shin, Easwaran, Lee 2009
 ///
@@ -51,7 +156,7 @@ use model::*;
 /// - A function which provides the set of arrival times of a task to check.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable<'a, 'b, 'c, FDem, FAk>(
+pub fn is_schedulable_demand<'a, 'b, 'c, FDem, FAk>(
     taskset: &'a [RTTask],
     model: &'b MPRModel,
     mut demand_fn: FDem,
@@ -77,198 +182,58 @@ pub fn is_schedulable<'a, 'b, 'c, FDem, FAk>(
     })
 }
 
-pub fn generate_interface_naive_search<FProcs, FModel>(
-    taskset: &[RTTask],
-    period: Time,
-    (min_concurrency, max_concurrency): (u64, u64),
-    mut best_model_fn: FModel,
+
+// Given a taskset and a MPR Model's Period and number of CPUS, compute the
+// model's minimum resource. This needs the demand function (usually based on
+// the algorithm), a function which specified which intervals to check, and the
+// inverse of the Supply Bound Function that models your supply. It is also
+// possible to filter out some of the intervals, useful if it is possible to
+// compute which intervals have the same demand.
+pub fn generate_model_from_demand_linear<'a, 'b, FDem, FTime>(
+    taskset: &'a [RTTask],
+    model_period: Time,
+    model_concurrency: u64,
+    mut demand_fn: FDem,
+    mut time_intervals_fn: FTime,
 ) -> Option<MPRModel>
     where
-        FModel: FnMut(&[RTTask], Time, u64) -> Option<MPRModel>
+        'a: 'b,
+        FDem: FnMut(&'a [RTTask], usize, &'a RTTask, Time, u64, Time) -> Time,
+        FTime: FnMut(&'a [RTTask], usize, &'a RTTask, Time, u64) -> Box<dyn Iterator<Item = Time> + 'b>,
 {
-    (min_concurrency ..= max_concurrency)
-        .filter_map(|concurrency| best_model_fn(taskset, period, concurrency))
-        .min_by_key(|model: &MPRModel| model.resource)
-}
+    let max_feasible_resource = model_period * model_concurrency as f64;
 
-pub fn generate_interface_linear_search<FProcs, FModel>(
-    taskset: &[RTTask],
-    period: Time,
-    (min_concurrency, max_concurrency): (u64, u64),
-    mut best_model_fn: FModel,
-) -> Option<MPRModel>
-    where
-        FModel: FnMut(&[RTTask], Time, u64) -> Option<MPRModel>
-{
-    (min_concurrency ..= max_concurrency)
-        .filter_map(|concurrency| best_model_fn(taskset, period, concurrency))
-        .next()
-}
+    taskset.iter().enumerate()
+    .map(|(k, task_k)| {
+        let time_intervals =
+            time_intervals_fn(taskset, k, task_k, model_period, model_concurrency);
 
-pub fn generate_interface_binary_search<FProcs, FModel>(
-    taskset: &[RTTask],
-    period: Time,
-    (min_concurrency, max_concurrency): (u64, u64),
-    mut best_model_fn: FModel,
-) -> Option<MPRModel>
-    where
-        FModel: FnMut(&[RTTask], Time, u64) -> Option<MPRModel>
-{
-    binary_search_fn(
-        (min_concurrency as usize, max_concurrency as usize),
-        |concurrency|
-            best_model_fn(taskset, period, concurrency as u64),
-        |model: &Option<MPRModel>| {
-            if model.is_some() {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Greater
-            }
-        }
-    )
-    .filter(|model: &MPRModel| model.is_feasible())
-}
+        time_intervals
+            .map(|arrival_k| {
+                let interval = arrival_k + task_k.deadline;
+                let demand = demand_fn(taskset, k, task_k, model_period, model_concurrency, arrival_k);
 
-// global EDF for MPR, inverse -------------------------------------------------
+                // move this function as static method of
+                let resource = MPRModel::resource_from_supply_linear(
+                    demand, interval, model_period, model_concurrency
+                );
 
-// Section 5.1 [1]
-pub fn generate_interface_global_edf_simple(taskset: &[RTTask], period: Time, step_size: Time) -> Result<MPRModel, Error> {
-    AnalysisUtils::assert_constrained_deadlines(taskset)?;
-    AnalysisUtils::assert_integer_times(taskset)?;
-
-    generic::generate_interface(
-        taskset,
-        period,
-        generic::GenerationStrategy::MonotoneLinearSearch,
-        num_processors_lower_bound,
-        num_processors_upper_bound,
-        |taskset, model|
-            minimum_required_resource_edf(taskset, model, step_size),
-    )
-}
-
-pub fn generate_interface_global_edf(taskset: &[RTTask], period: Time, step_size: Time) -> Result<MPRModel, Error> {
-    AnalysisUtils::assert_constrained_deadlines(taskset)?;
-    AnalysisUtils::assert_integer_times(taskset)?;
-
-    generic::generate_interface(
-        taskset,
-        period,
-        generic::GenerationStrategy::MonotoneBinarySearch,
-        num_processors_lower_bound,
-        num_processors_upper_bound,
-        |taskset, model|
-            minimum_required_resource_edf(taskset, model, step_size),
-    )
-}
-
-fn minimum_required_resource_edf(
-    taskset: &[RTTask],
-    model: &MPRModelSpecification,
-    step_size: Time,
-) -> Result<Time, Error> {
-    generic::minimum_required_resource(
-        taskset,
-        model,
-        step_size,
-        |taskset, model|
-            Ok(generic::minimum_resource_for_taskset(taskset, model.period)),
-        |taskset, model|
-            generic::minimum_required_resource_inv(
-                taskset,
-                model,
-                |taskset, k, task_k, model, arrival_k|
-                    demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
-                |demand, interval, model|
-                    MPRModel::resource_from_supply_linear(demand, interval, model.period, model.concurrency),
-
-                // To bound Ak as in Theorem 2 we must know the value of Theta.
-                // However, since Theta is being computed, we use its smallest
-                // (0) and largest (mPi) possible values to bound Ak. [1]
-                |_, _, _, model|
-                    Ok(model.concurrency as f64 * model.period),
-
-                // It is also easy to show that Equation (5) only needs to be
-                // evaluated at those values of Ak for which at least one  of
-                // I_hat, I_flat, or sbf change. [1]
-                //
-                // Both functions I_hat and I_flat change their value based on
-                // Wi and CIi, on a periodic basis: their values are the same
-                // every interval of the form [D_i + aT_i, D_i + T_I + aT_i] for
-                // all a >= 0. The I_hat function also changes in the interval
-                // [0, C_i]. The linear supply bound function changes at every
-                // interval, but we can consider only the intervals where I_hat
-                // and I_flat change, as it is a monotone function (i.e., if
-                // it's satisfied between those intervals, it will be also
-                // satisfied outside because of monotonicity).
-                |taskset, _, task_k, _, arrival_k| {
-                    let interval = arrival_k + task_k.deadline;
-
-                    // Perform the test only where I_hat/I_flat values change.
-                    taskset.iter().any(|task_i| {
-                        let modulus = arrival_k % task_i.period;
-
-                        interval <= task_i.wcet || modulus == Time::zero()
-                    })
-                },
-            ),
-        is_schedulable_edf,
-    )
-}
-
-#[inline(always)]
-pub fn num_processors_lower_bound(taskset: &[RTTask]) -> u64 {
-    f64::ceil(RTUtils::total_utilization(taskset)) as u64
-}
-
-// Section 5.1, Lemma 4 [1]
-#[inline(always)]
-pub fn num_processors_upper_bound(taskset: &[RTTask]) -> u64 {
-    debug_assert!(!taskset.is_empty());
-
-    let n = taskset.len() as u64;
-
-    let den = taskset.iter()
-        .map(|task| task.laxity())
-        .min()
-        .unwrap();
-
-    if den == Time::zero() {
-        todo!("unexpected");
-    }
-
-    let total_work: Time = taskset.iter()
-        .map(|task| task.wcet)
-        .sum();
-
-    (total_work / den).ceil() as u64 + n
-}
-
-// Equation 3 [1]
-fn workload_upperbound_2_edf(task: &RTTask, time: Time) -> Time {
-    activations_in_interval_edf(task, time) * task.wcet + carry_in_edf(task, time)
-}
-
-fn workload_upperbound_edf(task: &RTTask, time: Time) -> Time {
-    activations_in_interval_edf(task, time) * task.wcet
-}
-
-// Equation 3 [1]
-#[inline(always)]
-fn activations_in_interval_edf(task: &RTTask, time: Time) -> f64 {
-    ((time + task.period - task.deadline) / task.period).floor()
-}
-
-// Equation 3 [1]
-#[inline(always)]
-fn carry_in_edf(task: &RTTask, time: Time) -> Time {
-    Time::min(
-        task.wcet,
-        Time::max(
-            Time::zero(),
-            time - activations_in_interval_edf(task, time) * task.period
-        )
-    )
+                if resource > max_feasible_resource {
+                    None
+                } else {
+                    Some(resource)
+                }
+            })
+            // try_fold instead of max to short-circuit on the minimum resource
+            // being greater than the max feasible resource.
+            .try_fold(Time::zero(), |acc: Time, res| Some(acc.max(res?)))
+    })
+    .try_fold(Time::zero(), |acc: Time, res| Some(acc.max(res?)))
+    .map(|best_resource| MPRModel {
+        resource: best_resource,
+        period: model_period,
+        concurrency: model_concurrency,
+    })
 }
 
 // Tests -----------------------------------------------------------------------

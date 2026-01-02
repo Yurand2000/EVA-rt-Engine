@@ -38,18 +38,21 @@ fn main() {
         args.taskset_unit,
     ).unwrap();
 
-    let min_period = args.min_period_us.unwrap_or(args.max_period_us);
+    let min_period = Time::micros(args.min_period_us.unwrap_or(args.max_period_us) as f64);
+    let max_period = Time::micros(args.max_period_us as f64);
+    let period_step = Time::micros(args.period_step_us as f64);
+
+    let resource_step = Time::nanos(args.step_size_ns as f64);
 
     let model =
-        (min_period ..= args.max_period_us)
-        .step_by(args.period_step_us as usize)
-        .map(|period_ns| {
-            eva_rt_engine::algorithms::multiprocessor_periodic_resource_model::bcl_2009::
-                generate_interface_global_fp(&taskset, Time::nanos(period_ns as f64), Time::nanos(args.step_size_ns as f64))
-            .unwrap()
-        })
-        .min_by_key(|model| model.resource)
-        .unwrap();
+        eva_rt_engine::algorithms::full_preemption::global_multiprocessor::hierarchical::
+        mpr_model09::fixed_priority::bcl09::extra::generate_best_model(
+            &taskset,
+            (min_period, max_period, period_step),
+            resource_step
+        );
+
+    let model = model.result.unwrap();
 
     let scale =
         match args.taskset_unit {

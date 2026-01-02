@@ -2,20 +2,20 @@
 //!
 //! #### Model:
 //! - Periodic/Sporadic Task model
-//! - Fully-Preemptive generic Work Conserving scheduling policy
+//! - Fully-Preemptive EDF local scheduling
 //!
 //! #### Preconditions:
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable_edf`] \
-//!   | O(*n^2*) complexity
-//! - [`is_schedulable_edf_simple`] \
-//!   | O(*n^2*) complexity
-//! - [`generate_interface_global_edf_simple`] \
-//!   | O(*n^2*) complexity
-//! - [`generate_interface_global_edf`] \
-//!   | O(*n^2*) complexity
+//! - [`is_schedulable`] \
+//!   | ?? complexity
+//! - [`generate_model_linear`] \
+//!   | ?? complexity
+//! - [`extra::generate_model`] \
+//!   | ?? complexity
+//! - [`extra::generate_best_model`] \
+//!   | ?? complexity
 //!
 //! ---
 //! #### References:
@@ -34,7 +34,7 @@ const ALGORITHM: &str = "MPR Model, EDF Local Scheduler (Shin, Easwaran, Lee 200
 /// MPR Model, EDF Local Scheduler - Shin, Easwaran, Lee 2009 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable_edf(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
+pub fn is_schedulable(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
     if !RTUtils::constrained_deadlines(taskset) {
         return SchedResultFactory(ALGORITHM).constrained_deadlines();
     }
@@ -47,7 +47,7 @@ pub fn is_schedulable_edf(taskset: &[RTTask], model: &MPRModel) -> SchedResult<(
 
     // Section 4.2, Theorem 1 [1]
     let schedulable =
-        is_schedulable(
+        is_schedulable_demand(
             taskset,
             model,
             |taskset, k, task_k, model, arrival_k|
@@ -57,8 +57,7 @@ pub fn is_schedulable_edf(taskset: &[RTTask], model: &MPRModel) -> SchedResult<(
                     arrival_k_upperbound_edf(taskset, task_k, model);
 
                 Box::new(
-                    (0 ..= arrival_k_upperbound.as_nanos() as u64)
-                    .map(|time_ns| Time::nanos(time_ns as f64))
+                    time_range_iterator(Time::zero(), arrival_k_upperbound)
                     .filter(|arrival_k| filter_intervals_edf(taskset, task_k, model, *arrival_k))
                 )
             }
@@ -67,30 +66,83 @@ pub fn is_schedulable_edf(taskset: &[RTTask], model: &MPRModel) -> SchedResult<(
     SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
 }
 
-fn is_schedulable_edf_simple(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
+#[allow(unused)]
+fn is_schedulable_simple(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
     if !RTUtils::constrained_deadlines(taskset) {
         return SchedResultFactory(ALGORITHM).constrained_deadlines();
     }
 
     // Section 4.2, Theorem 1 [1]
     let schedulable =
-        is_schedulable(
+        is_schedulable_demand(
             taskset,
             model,
             |taskset, k, task_k, model, arrival_k|
                 demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
-            |taskset, _, task_k, model| -> Box<dyn Iterator<Item = Time>> {
+            |taskset, _, task_k, model|  {
                 let arrival_k_upperbound =
                     arrival_k_upperbound_edf(taskset, task_k, model);
 
-                Box::new(
-                    (0 ..= arrival_k_upperbound.as_nanos() as u64)
-                    .map(|time_ns| Time::nanos(time_ns as f64))
-                )
+                Box::new(time_range_iterator(Time::zero(), arrival_k_upperbound))
             }
         );
 
     SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+}
+
+pub fn generate_model_linear(
+    taskset: &[RTTask],
+    model_period: Time,
+    model_concurrency: u64,
+) -> DesignResult<MPRModel> {
+    if !RTUtils::constrained_deadlines(taskset) {
+        return DesignResultFactory(ALGORITHM).constrained_deadlines();
+    }
+
+    let model =
+        generate_model_from_demand_linear(
+            taskset,
+            model_period,
+            model_concurrency,
+            |taskset, k, task_k, _, concurrency, arrival_k|
+                demand_edf(taskset, k, task_k, concurrency, arrival_k),
+            |taskset, _, task_k, period, concurrency| -> Box<dyn Iterator<Item = Time>> {
+                // To bound Ak as in Theorem 2 we must know the value of Theta.
+                // However, since Theta is being computed, we use its smallest
+                // (0) and largest (mPi) possible values to bound Ak. [1]
+                let arrival_k_upperbound = concurrency as f64 * period;
+
+                Box::new(
+                    (0 ..= arrival_k_upperbound.as_nanos() as u64)
+                    .map(|time_ns| Time::nanos(time_ns as f64))
+                    .filter(|arrival_k| {
+                        // It is also easy to show that Equation (5) only needs to be
+                        // evaluated at those values of Ak for which at least one  of
+                        // I_hat, I_flat, or sbf change. [1]
+                        //
+                        // Both functions I_hat and I_flat change their value based on
+                        // Wi and CIi, on a periodic basis: their values are the same
+                        // every interval of the form [D_i + aT_i, D_i + T_I + aT_i] for
+                        // all a >= 0. The I_hat function also changes in the interval
+                        // [0, C_i]. The linear supply bound function changes at every
+                        // interval, but we can consider only the intervals where I_hat
+                        // and I_flat change, as it is a monotone function (i.e., if
+                        // it's satisfied between those intervals, it will be also
+                        // satisfied outside because of monotonicity).
+                        let interval = *arrival_k + task_k.deadline;
+
+                        // Perform the test only where I_hat/I_flat values change.
+                        taskset.iter().any(|task_i| {
+                            let modulus = *arrival_k % task_i.period;
+
+                            interval <= task_i.wcet || modulus == Time::zero()
+                        })
+                    })
+                )
+            },
+        );
+
+    DesignResultFactory(ALGORITHM).from_option(model)
 }
 
 fn filter_intervals_edf(
@@ -195,6 +247,157 @@ fn interference_hat(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, arriva
     }
 }
 
+fn num_processors_lower_bound(taskset: &[RTTask]) -> u64 {
+    f64::ceil(RTUtils::total_utilization(taskset)) as u64
+}
+
+// Section 5.1, Lemma 4 [1]
+fn num_processors_upper_bound(taskset: &[RTTask]) -> u64 {
+    debug_assert!(!taskset.is_empty());
+
+    let n = taskset.len() as u64;
+
+    let den = taskset.iter()
+        .map(|task| task.laxity())
+        .min()
+        .unwrap();
+
+    if den == Time::zero() {
+        todo!("unexpected");
+    }
+
+    let total_work: Time = taskset.iter()
+        .map(|task| task.wcet)
+        .sum();
+
+    (total_work / den).ceil() as u64 + n
+}
+
+// Equation 3 [1]
+fn workload_upperbound_2_edf(task: &RTTask, time: Time) -> Time {
+    activations_in_interval_edf(task, time) * task.wcet + carry_in_edf(task, time)
+}
+
+fn workload_upperbound_edf(task: &RTTask, time: Time) -> Time {
+    activations_in_interval_edf(task, time) * task.wcet
+}
+
+// Equation 3 [1]
+#[inline(always)]
+fn activations_in_interval_edf(task: &RTTask, time: Time) -> f64 {
+    ((time + task.period - task.deadline) / task.period).floor()
+}
+
+// Equation 3 [1]
+#[inline(always)]
+fn carry_in_edf(task: &RTTask, time: Time) -> Time {
+    Time::min(
+        task.wcet,
+        Time::max(
+            Time::zero(),
+            time - activations_in_interval_edf(task, time) * task.period
+        )
+    )
+}
+
+pub mod extra {
+    use crate::prelude::*;
+    use crate::algorithms::full_preemption::global_multiprocessor::hierarchical::mpr_model09::*;
+
+    pub fn generate_model(
+        taskset: &[RTTask],
+        model_period: Time,
+        model_concurrency: u64,
+        resource_step: Time,
+    ) -> DesignResult<MPRModel> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            return DesignResultFactory(super::ALGORITHM).constrained_deadlines();
+        }
+
+        __generate_model(taskset, model_period, model_concurrency, resource_step)
+    }
+
+    fn __generate_model(
+        taskset: &[RTTask],
+        model_period: Time,
+        model_concurrency: u64,
+        resource_step: Time,
+    ) -> DesignResult<MPRModel> {
+        let min_feasible_resource =
+            RTUtils::total_utilization(taskset) * model_period;
+        let max_feasible_resource_model =
+            super::generate_model_linear(taskset, model_period, model_concurrency);
+
+        if !max_feasible_resource_model.is_successful() {
+            return max_feasible_resource_model;
+        }
+
+        let max_feasible_resource = max_feasible_resource_model.result.unwrap().resource;
+
+        let best_model =
+            time_range_iterator_w_step(min_feasible_resource, max_feasible_resource, resource_step)
+            .find_map(|resource| {
+                let model = MPRModel {
+                    resource,
+                    period: model_period,
+                    concurrency: model_concurrency,
+                };
+
+                if super::is_schedulable(taskset, &model).is_schedulable() {
+                    Some(model)
+                } else {
+                    None
+                }
+            });
+
+        DesignResultFactory(super::ALGORITHM).from_option(best_model)
+    }
+
+    pub fn generate_best_model(
+        taskset: &[RTTask],
+        (min_period, max_period, period_step): (Time, Time, Time),
+        resource_step: Time,
+    ) -> DesignResult<MPRModel> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            return DesignResultFactory(super::ALGORITHM).constrained_deadlines();
+        }
+
+        let min_processors =
+            super::num_processors_lower_bound(taskset) as usize;
+
+        let max_processors =
+            super::num_processors_upper_bound(taskset) as usize;
+
+        let best_model =
+            time_range_iterator_w_step(min_period, max_period, period_step)
+            .flat_map(|period| {
+                let best_model =
+                    binary_search_fn(
+                        (min_processors, max_processors),
+                        |concurrency|
+                            __generate_model(
+                                taskset,
+                                period,
+                                concurrency as u64,
+                                resource_step
+                            ),
+                        |model| -> std::cmp::Ordering {
+                            if model.is_successful() {
+                                std::cmp::Ordering::Less
+                            } else {
+                                std::cmp::Ordering::Greater
+                            }
+                        }
+                    );
+
+                best_model.result.ok()
+            })
+            .min_by_key(|model| model.resource);
+
+        DesignResultFactory(super::ALGORITHM).from_option(best_model)
+    }
+}
+
 // -----------------------------------------------------------------------------
 
 #[test]
@@ -211,6 +414,6 @@ pub fn simple_vs_optimized() {
         concurrency: 2,
     };
 
-    assert!(is_schedulable_edf(&taskset, &model).is_schedulable());
-    assert!(is_schedulable_edf_simple(&taskset, &model).is_schedulable());
+    assert!(is_schedulable(&taskset, &model).is_schedulable());
+    assert!(is_schedulable_simple(&taskset, &model).is_schedulable());
 }

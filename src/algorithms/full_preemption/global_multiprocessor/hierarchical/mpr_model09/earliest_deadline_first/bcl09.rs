@@ -1,8 +1,8 @@
-//! ## MPR Model, FP Local Scheduler - *Derived from* Bertogna, Cirinei, Lipari 2009
+//! ## MPR Model, EDF Local Scheduler - *Derived from* Bertogna, Cirinei, Lipari 2009
 //!
 //! #### Model:
 //! - Periodic/Sporadic Task model
-//! - Fully-Preemptive Fixed Priority local scheduling
+//! - Fully-Preemptive EDF local scheduling
 //!
 //! #### Preconditions:
 //! - Constrained Deadlines
@@ -26,7 +26,7 @@
 
 use crate::prelude::*;
 use crate::algorithms::full_preemption::global_multiprocessor::hierarchical::mpr_model09::*;
-use crate::algorithms::full_preemption::global_multiprocessor::fixed_priority::bcl09::global_fixed_priority_demand;
+use crate::algorithms::full_preemption::global_multiprocessor::earliest_deadline_first::bcl09::global_earliest_deadline_first_demand;
 
 const ALGORITHM: &str = "MPR Model, FP Local Scheduler (*Derived from* Bertogna, Cirinei, Lipari 2009)";
 
@@ -43,7 +43,7 @@ pub fn is_schedulable(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
             taskset,
             model,
             |taskset, k, task_k, _, _|
-                demand_fp(taskset, k, task_k, model.concurrency),
+                demand_edf(taskset, k, task_k, model.concurrency),
             |_, _, _, _| Box::new(std::iter::once(Time::zero())),
         );
 
@@ -65,17 +65,17 @@ pub fn generate_model_linear(
             model_period,
             model_concurrency,
             |taskset, k, task_k, _, concurrency, _|
-                demand_fp(taskset, k, task_k, concurrency),
+                demand_edf(taskset, k, task_k, concurrency),
             |_, _, _, _, _| Box::new(std::iter::once(Time::zero())),
         );
 
     DesignResultFactory(ALGORITHM).from_option(model)
 }
 
-fn demand_fp(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
-    global_fixed_priority_demand(taskset, k, task_k)
+fn demand_edf(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
+    global_earliest_deadline_first_demand(taskset, k, task_k)
         +
-    concurrency as f64 * (task_k.wcet - Time::one())
+    concurrency as f64 * task_k.wcet
 }
 
 pub mod extra {

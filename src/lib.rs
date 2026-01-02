@@ -25,6 +25,8 @@ pub mod prelude {
     pub use super::{
         fixpoint_search_with_limit,
         binary_search_fn,
+        time_range_iterator_w_step,
+        time_range_iterator,
     };
 }
 
@@ -89,4 +91,17 @@ pub fn binary_search_fn<T, FVal, FCmp>(
             return mid_value;
         }
     }
+}
+
+use crate::prelude::*;
+
+pub fn time_range_iterator(start: Time, end: Time) -> impl Iterator<Item = Time> {
+    (start.value_ns as usize ..= end.value_ns as usize)
+        .map(|time_ns| Time { value_ns: time_ns as f64 })
+}
+
+pub fn time_range_iterator_w_step(start: Time, end: Time, step: Time) -> impl Iterator<Item = Time> {
+    (start.value_ns as usize ..= end.value_ns as usize)
+        .step_by(step.value_ns as usize)
+        .map(|time_ns| Time { value_ns: time_ns as f64 })
 }
