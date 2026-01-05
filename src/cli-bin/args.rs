@@ -76,5 +76,5 @@ pub struct TasksetArgs {
 
     /// Taskset file type
     #[arg(value_enum, short='f', long="format", value_name="FORMAT", default_value="auto")]
-    pub taskset_file_ty: eva_rt_engine::common::taskset_serde::TasksetFileType,
+    pub taskset_file_ty: eva_rt_engine::prelude::TasksetFileType,
 }

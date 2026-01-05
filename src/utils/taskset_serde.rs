@@ -1,14 +1,5 @@
 use crate::prelude::*;
 
-pub mod prelude {
-    pub use super::{
-        TasksetFileType,
-        TasksetPlainUnit,
-        TasksetParseError,
-        parse_taskset,
-    };
-}
-
 #[derive(Debug, Clone, Copy)]
 #[derive(PartialEq, Eq)]
 #[derive(clap::ValueEnum)]

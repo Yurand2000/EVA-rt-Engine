@@ -24,12 +24,12 @@ pub mod prelude {
         sched_result::*,
         design_result::*,
         time_iterators::*,
+        taskset_serde::*,
     };
 }
 
 pub mod analysis;
 pub mod algorithms;
-pub mod common;
 
 /// Utility Functions
 pub mod utils {
@@ -38,4 +38,5 @@ pub mod utils {
     pub mod sched_result;
     pub mod design_result;
     pub mod time_iterators;
+    pub mod taskset_serde;
 }
