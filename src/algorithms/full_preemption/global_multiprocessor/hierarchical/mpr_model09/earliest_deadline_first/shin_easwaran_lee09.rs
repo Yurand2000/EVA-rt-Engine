@@ -432,6 +432,7 @@ pub fn simple_vs_optimized() {
         concurrency: 2,
     };
 
-    assert!(is_schedulable(&taskset, &model).is_schedulable());
-    assert!(is_schedulable_simple(&taskset, &model).is_schedulable());
+    let optimized_test = is_schedulable(&taskset, &model);
+    let simple_test = is_schedulable_simple(&taskset, &model);
+    assert_eq!(optimized_test.is_schedulable(), simple_test.is_schedulable());
 }

@@ -94,7 +94,7 @@ impl MPRModel {
         debug_assert!(lsbf >= Time::zero());
 
         let cpus = concurrency as f64;
-        let negb = 2.0 * period - interval + Time::nanos(2.0);
+        let negb = 2.0 * period - interval - Time::nanos(2.0);
         let bsqr = negb * negb;
 
         // Extracted Theta from Equation 2 [2]
@@ -251,9 +251,9 @@ pub fn generate_model_from_demand_linear<'a, 'b, FDem, FTime>(
 // Tests -----------------------------------------------------------------------
 #[test]
 fn test_lsbf() {
-    for resource in    (10 .. 1000).step_by(10).map(|ms| Time::millis(ms as f64)) {
-    for period in      (10 .. 1000).step_by(10).map(|ms| Time::millis(ms as f64)) {
-    for interval in    (10 .. 1000).step_by(10).map(|ms| Time::millis(ms as f64)) {
+    for resource in    time_range_iterator_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
+    for period in      time_range_iterator_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
+    for interval in    time_range_iterator_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
     for concurrency in   1 .. 10 {
         // skip unfeasible models
         if resource >= concurrency as f64 * period {
