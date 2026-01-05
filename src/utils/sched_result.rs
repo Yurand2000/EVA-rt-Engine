@@ -104,6 +104,16 @@ impl<T> std::fmt::Display for SchedResult<T> {
     }
 }
 
+impl<T> Into<anyhow::Result<bool>> for SchedResult<T> {
+    fn into(self) -> anyhow::Result<bool> {
+        match self.result {
+            Ok(_) => Ok(true),
+            Err(SchedError::NonSchedulable(_)) => Ok(false),
+            Err(err) => Err(err.into())
+        }
+    }
+}
+
 /// Helper factory for common schedulability test errors.
 ///
 /// Takes the test's name as first parameter.

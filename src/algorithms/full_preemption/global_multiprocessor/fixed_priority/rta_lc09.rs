@@ -45,13 +45,13 @@ pub fn is_schedulable(taskset: &[RTTask], cpus: usize) -> SchedResult<()> {
 }
 
 // Equation 5 [1]
-pub fn workload_non_carry_in(interval: Time, task: &RTTask) -> Time {
+fn workload_non_carry_in(interval: Time, task: &RTTask) -> Time {
     (interval / task.period).floor() * task.wcet
         + Time::min(task.wcet, interval % task.period)
 }
 
 // Equation 6 [1]
-pub fn workload_carry_in(interval: Time, task: &RTTask, task_rt: Time) -> Time {
+fn workload_carry_in(interval: Time, task: &RTTask, task_rt: Time) -> Time {
     let work_interval = Time::max(Time::zero(), interval - task.wcet);
 
     (work_interval / task.period).floor() * task.wcet
@@ -64,7 +64,7 @@ pub fn workload_carry_in(interval: Time, task: &RTTask, task_rt: Time) -> Time {
 }
 
 // Equation 7 [1]
-pub fn interference_non_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTask) -> Time {
+fn interference_non_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTask) -> Time {
     Time::clamp(
         workload_non_carry_in(interval, task_i),
         Time::zero(),
@@ -73,7 +73,7 @@ pub fn interference_non_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTas
 }
 
 // Equation 8 [1]
-pub fn interference_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTask, task_i_rt: Time) -> Time {
+fn interference_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTask, task_i_rt: Time) -> Time {
     Time::clamp(
         workload_carry_in(interval, task_i, task_i_rt),
         Time::zero(),
@@ -82,7 +82,7 @@ pub fn interference_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTask, t
 }
 
 // Equation 9 [1]
-pub fn total_interference(interval: Time, cpus: usize, taskset: &[RTTask], k: usize, task_rts: &[Time]) -> Time {
+fn total_interference(interval: Time, cpus: usize, taskset: &[RTTask], k: usize, task_rts: &[Time]) -> Time {
     assert!(task_rts.len() == k);
 
     let interferences_non_carry_in: Vec<_> =
@@ -109,7 +109,7 @@ pub fn total_interference(interval: Time, cpus: usize, taskset: &[RTTask], k: us
 }
 
 // Equation 12 [1]
-pub fn response_time(taskset: &[RTTask], k: usize, cpus: usize, task_rts: &[Time]) -> Time {
+fn response_time(taskset: &[RTTask], k: usize, cpus: usize, task_rts: &[Time]) -> Time {
     let mut prev_x = taskset[k].wcet;
     let mut x;
     loop {

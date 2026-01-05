@@ -2,11 +2,11 @@
 //!
 //! #### Implements:
 //! - [`MPRModel`] \
-//!   | ??
+//!   | Multi-Processor Periodic Resource Model
 //! - [`is_schedulable_demand`] \
-//!   | ?? complexity
+//!   | O(*taskset_size*) * O(*arrival_times*) * O(*demand_fn) complexity
 //! - [`generate_model_from_demand_linear`] \
-//!   | ?? complexity
+//!   | O(*taskset_size*) * O(*arrival_times*) * O(*demand_fn) complexity
 //!
 //! ---
 //! #### References:
@@ -29,9 +29,12 @@ pub mod fixed_priority {
     pub mod bcl09;
 }
 
-// Section 3.2 [1]
+/// Multiprocessor Periodic Resource Model - Shin, Easwaran, Lee 2009
+///
+/// Refer to the [module](`self`) level documentation.
 #[derive(Debug, Clone)]
 pub struct MPRModel {
+    // Section 3.2 [1]
     pub resource: Time,
     pub period: Time,
     pub concurrency: u64,
@@ -182,13 +185,22 @@ pub fn is_schedulable_demand<'a, 'b, 'c, FDem, FAk>(
     })
 }
 
-
-// Given a taskset and a MPR Model's Period and number of CPUS, compute the
-// model's minimum resource. This needs the demand function (usually based on
-// the algorithm), a function which specified which intervals to check, and the
-// inverse of the Supply Bound Function that models your supply. It is also
-// possible to filter out some of the intervals, useful if it is possible to
-// compute which intervals have the same demand.
+/// Multiprocessor Periodic Resource Model - Shin, Easwaran, Lee 2009
+///
+/// Generic implementation for the generation of the MPRModel.
+/// Requires:
+/// - MPRModel's period and maximum concurrency.
+/// - A demand function, which describes the workload demand of the taskset at a given timepoint.
+/// - A function which provides the set of arrival times of a task to check.
+///
+/// Given a taskset and a MPR Model's Period and number of CPUS, compute the
+/// model's minimum resource. This needs the demand function (usually based on
+/// the algorithm), a function which specified which intervals to check, and the
+/// inverse of the Supply Bound Function that models your supply. It is also
+/// possible to filter out some of the intervals, useful if it is possible to
+/// compute which intervals have the same demand.
+///
+/// Refer to the [module](`self`) level documentation.
 pub fn generate_model_from_demand_linear<'a, 'b, FDem, FTime>(
     taskset: &'a [RTTask],
     model_period: Time,

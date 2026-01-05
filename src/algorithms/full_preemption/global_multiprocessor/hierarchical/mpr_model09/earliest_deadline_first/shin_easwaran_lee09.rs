@@ -9,13 +9,13 @@
 //!
 //! #### Implements:
 //! - [`is_schedulable`] \
-//!   | ?? complexity
+//!   | pseudo-polynomial complexity
 //! - [`generate_model_linear`] \
-//!   | ?? complexity
+//!   | pseudo-polynomial complexity
 //! - [`extra::generate_model`] \
-//!   | ?? complexity
+//!   | pseudo-polynomial complexity
 //! - [`extra::generate_best_model`] \
-//!   | ?? complexity
+//!   | pseudo-polynomial complexity
 //!
 //! ---
 //! #### References:
@@ -90,6 +90,12 @@ fn is_schedulable_simple(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()
     SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
 }
 
+/// MPR Model, EDF Local Scheduler - Shin, Easwaran, Lee 2009 \[1\]
+///
+/// Generate the best MPRModel for the given taskset. This requires the model's
+/// period and maxmimum cuncurrency.
+///
+/// Refer to the [module](`self`) level documentation.
 pub fn generate_model_linear(
     taskset: &[RTTask],
     model_period: Time,
@@ -304,6 +310,12 @@ pub mod extra {
     use crate::prelude::*;
     use crate::algorithms::full_preemption::global_multiprocessor::hierarchical::mpr_model09::*;
 
+    /// MPR Model, EDF Local Scheduler - Shin, Easwaran, Lee 2009 \[1\]
+    ///
+    /// Generate the best MPRModel for the given taskset. This requires the model's
+    /// period and maxmimum cuncurrency.
+    ///
+    /// Refer to the [module](`self`) level documentation.
     pub fn generate_model(
         taskset: &[RTTask],
         model_period: Time,
@@ -353,6 +365,12 @@ pub mod extra {
         DesignResultFactory(super::ALGORITHM).from_option(best_model)
     }
 
+    /// MPR Model, EDF Local Scheduler - Shin, Easwaran, Lee 2009 \[1\]
+    ///
+    /// Generate the best MPRModel for the given taskset. Searches the space of
+    /// possible MPRModels given a range of valid periods.
+    ///
+    /// Refer to the [module](`self`) level documentation.
     pub fn generate_best_model(
         taskset: &[RTTask],
         (min_period, max_period, period_step): (Time, Time, Time),
