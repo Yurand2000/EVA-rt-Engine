@@ -79,11 +79,11 @@ fn equal_to_shin_lee03_rta()
     let taskset = [
         RTTask::new_ns(2, 50, 100),
         RTTask::new_ns(49, 100, 100),
-        RTTask::new_ns(49, 100, 100),
+        RTTask::new_ns(34, 100, 100),
     ];
 
-    for period in time_range_iterator_w_step(Time::nanos(50.0), Time::nanos(200.0), Time::nanos(1.0)) {
-        for resource in time_range_iterator_w_step(period / 5.0, period, Time::nanos(1.0)) {
+    for period in time_range_iterator_w_step(Time::nanos(10.0), Time::nanos(100.0), Time::nanos(1.0)) {
+        for resource in time_range_iterator_w_step(period / 10.0, period, Time::nanos(1.0)) {
             let model = PRModel { resource, period };
 
             let shin_lee_test = super::shin_lee03::is_schedulable(&taskset, &model);

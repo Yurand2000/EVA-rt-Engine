@@ -90,7 +90,11 @@ impl PRModel {
 
         diff + self.period * (supply / self.resource).floor()
             +
-        Time::max(supply - self.resource * (supply / self.resource).floor(), - diff) + diff
+        if supply % self.resource > Time::zero() {
+            diff + supply % self.resource
+        } else {
+            Time::zero()
+        }
     }
 
     pub fn get_interval_from_supply_linear(&self, supply: Time) -> Time {
