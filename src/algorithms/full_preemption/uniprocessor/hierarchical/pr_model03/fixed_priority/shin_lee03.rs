@@ -49,7 +49,7 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Ti
     }
 }
 
-/// Periodic Resource Model, EDF Local Scheduling - Shin & Lee 2003 \[1\] \
+/// Periodic Resource Model, Fixed Priority Local Scheduling - Shin & Lee 2003 \[1\] \
 /// Derive the best [`PRModel`] using demand analysis.
 ///
 /// Refer to the [module](`self`) level documentation.
