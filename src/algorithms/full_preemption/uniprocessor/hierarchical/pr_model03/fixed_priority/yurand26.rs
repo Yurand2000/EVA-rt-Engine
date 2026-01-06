@@ -10,14 +10,13 @@
 //! #### Implements:
 //! - [`is_schedulable`] \
 //!   | pseudo-polynomial complexity
-//! - [`generate_model_linear`] \
-//!   | Generate the suitable interface given the taskset and the [`PRModel`]'s period. \
-//!   | \
-//!   | O(*n*) complexity
 //!
 //! ---
 //! #### References:
 //! 1. Unpublished
+//! 2. Shin and I. Lee, “Periodic resource model for compositional real-time
+//!    guarantees,” in RTSS 2003. 24th IEEE Real-Time Systems Symposium, 2003,
+//!    Dec. 2003, pp. 2–13. doi: 10.1109/REAL.2003.1253249.
 
 use crate::prelude::*;
 use crate::algorithms::full_preemption::uniprocessor::hierarchical::pr_model03::*;
@@ -33,7 +32,7 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Ti
         return SchedResultFactory(ALGORITHM).constrained_deadlines();
     }
 
-    // Equation 14 [1]
+    // Equation 14 [2]
     let result: Result<Vec<_>, _> =
         taskset.iter().enumerate()
         .map(|(k, task_k)| {
@@ -60,7 +59,7 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Ti
 }
 
 fn rta(taskset: &[RTTask], k: usize, task_k: &RTTask, response: Time, model: &PRModel) -> Time {
-    // Standard RTA analysis
+    // Standard RTA analysis [2]
     taskset.iter()
         .take(k)
         .map(|task_i| (response / task_i.period).ceil() * task_i.wcet)
