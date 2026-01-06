@@ -68,7 +68,7 @@ pub fn generate_model_linear(taskset: &[RTTask], model_period: Time) -> DesignRe
 // Equation 10 [1]
 fn rta(taskset: &[RTTask], k: usize, task_k: &RTTask, response: Time) -> Time {
     taskset.iter()
-        .take(if k > 0 { k - 1 } else { 0 })
+        .take(k)
         .map(|task_i| (response / task_i.period).ceil() * task_i.wcet)
         .sum::<Time>()
     +

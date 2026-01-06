@@ -47,6 +47,7 @@ pub mod earliest_deadline_first {
 
 pub mod fixed_priority {
     pub mod shin_lee03;
+    pub mod yurand26;
 }
 
 /// Periodic Resource Model - Shin & Lee 2003 \[1\]
@@ -89,7 +90,7 @@ impl PRModel {
 
         diff + self.period * (supply / self.resource).floor()
             +
-        Time::max(diff + supply - self.resource * (supply / self.resource), Time::zero())
+        Time::max(supply - self.resource * (supply / self.resource).floor(), - diff) + diff
     }
 
     pub fn get_interval_from_supply_linear(&self, supply: Time) -> Time {
@@ -149,7 +150,7 @@ pub fn is_schedulable_response<FRTA>(
             let response =
                 fixpoint_search_with_limit(
                     task_k.wcet,
-                    task_k.deadline,
+                    task_k.deadline + Time::nanos(1.0),
                     |response: &Time|
                         model.get_interval_from_supply(
                             rta_fn(taskset, k, task_k, *response)
