@@ -112,20 +112,24 @@ impl MPRModel {
     pub fn to_periodic_tasks(&self) -> Vec<RTTask> {
         #[inline(always)]
         fn psi(model: &MPRModel) -> Time {
-            model.resource - model.concurrency as f64 *
-                (model.resource / model.concurrency as f64).floor()
+            model.resource % Time::nanos(model.concurrency as f64)
         }
 
-        let k = psi(&self).as_nanos();
+        if self.concurrency == 1 {
+            return vec![ RTTask { wcet: self.resource, deadline: self.period, period: self.period } ];
+        }
+
+        let psi = psi(&self);
+        let k = psi.as_nanos().floor() as u64;
 
         (0..self.concurrency)
             .map(|i| {
                 let wcet =
-                    if i <= k as u64 {
+                    if i < k {
                         (self.resource / self.concurrency as f64).floor() + Time::one()
-                    } else if i == k as u64 + 1 {
+                    } else if i == k {
                         (self.resource / self.concurrency as f64).floor()
-                            + psi(&self) - k * (psi(&self) / k).floor()
+                            + (psi % Time::nanos(k as f64)).floor()
                     } else {
                         (self.resource / self.concurrency as f64).floor()
                     };
