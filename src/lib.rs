@@ -17,18 +17,15 @@ pub mod prelude {
     pub use eva_rt_common::prelude::*;
     pub use eva_rt_common::utils::prelude::*;
     pub use super::algorithms::prelude::*;
-    pub use super::analysis::prelude::*;
     pub use super::utils::{
         binary_search::*,
         fixpoint_search::*,
         sched_result::*,
         design_result::*,
         time_iterators::*,
-        taskset_serde::*,
     };
 }
 
-pub mod analysis;
 pub mod algorithms;
 
 /// Utility Functions
@@ -38,5 +35,4 @@ pub mod utils {
     pub mod sched_result;
     pub mod design_result;
     pub mod time_iterators;
-    pub mod taskset_serde;
 }
