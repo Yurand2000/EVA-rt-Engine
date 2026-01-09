@@ -89,7 +89,7 @@ impl<T> std::fmt::Display for SchedResult<T> {
 
         match &self.result {
             Ok(_) =>
-                write!(f, "Analysis \"{}\": non schedulable.", self.test_name),
+                write!(f, "Analysis \"{}\": schedulable.", self.test_name),
             Err(NonSchedulable(None)) =>
                 write!(f, "Analysis \"{}\" error: non schedulable.", self.test_name),
             Err(NonSchedulable(Some(error))) =>

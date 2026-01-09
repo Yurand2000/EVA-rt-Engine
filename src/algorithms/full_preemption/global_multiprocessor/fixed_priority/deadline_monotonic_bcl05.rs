@@ -9,7 +9,7 @@
 //! - Deadline Monotonic priority assigment
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | linear *O(n)* complexity
 //!
 //! ---
@@ -21,28 +21,37 @@
 //!    doi: 10.1007/11795490_24.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Fixed Priority DM (Bertogna, Cirinei, Lipari 2005)";
 
 /// Multiprocessor Fixed Priority DM - Bertogna, Cirinei, Lipari 2005 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis {
+    pub num_processors: u64,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else if !RTUtils::is_taskset_sorted_by_deadline(taskset) {
+            Err(SchedError::deadline_monotonic())
+        } else {
+            Ok(())
+        }
     }
 
-    if !RTUtils::is_taskset_sorted_by_deadline(taskset) {
-        return SchedResultFactory(ALGORITHM).deadline_monotonic();
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // Theorem 5 [1]
+        let d_tot = RTUtils::total_density(taskset);
+        let d_max = RTUtils::largest_density(taskset);
+
+        let schedulable =
+            d_tot <= (self.num_processors as f64 / 2f64) * (1f64 - d_max) + d_max;
+
+        SchedError::result_from_schedulable(schedulable)
     }
-
-    // Theorem 5 [1]
-    let d_tot = RTUtils::total_density(taskset);
-    let d_max = RTUtils::largest_density(taskset);
-
-    let schedulable =
-        d_tot <= (num_processors as f64 / 2f64) * (1f64 - d_max) + d_max;
-
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
 }

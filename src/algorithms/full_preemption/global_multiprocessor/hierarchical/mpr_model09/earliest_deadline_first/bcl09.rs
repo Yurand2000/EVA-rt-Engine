@@ -8,7 +8,7 @@
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | O(*n^2*) complexity
 //! - [`generate_model_linear`] \
 //!   | O(*n^2*) complexity
@@ -33,21 +33,33 @@ const ALGORITHM: &str = "MPR Model, EDF Local Scheduler (*Derived from* Bertogna
 /// MPR Model, EDF Local Scheduler - *Derived from* Bertogna, Cirinei, Lipari 2009 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis {
+    pub model: MPRModel,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    let schedulable =
-        is_schedulable_demand(
-            taskset,
-            model,
-            |taskset, k, task_k, _, _|
-                demand_edf(taskset, k, task_k, model.concurrency),
-            |_, _, _, _| Box::new(std::iter::once(Time::zero())),
-        );
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        let schedulable =
+            is_schedulable_demand(
+                taskset,
+                &self.model,
+                |taskset, k, task_k, _, _|
+                    demand_edf(taskset, k, task_k, self.model.concurrency),
+                |_, _, _, _| Box::new(std::iter::once(Time::zero())),
+            );
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+        SchedError::result_from_schedulable(schedulable)
+    }
 }
 
 /// MPR Model, EDF Local Scheduler - *Derived from* Bertogna, Cirinei, Lipari 2009 \[1\]
@@ -127,14 +139,16 @@ pub mod extra {
         let best_model =
             time_range_iterator_w_step(min_feasible_resource, max_feasible_resource, resource_step)
             .find_map(|resource| {
-                let model = MPRModel {
-                    resource,
-                    period: model_period,
-                    concurrency: model_concurrency,
+                let analysis = super::Analysis {
+                    model: MPRModel {
+                        resource,
+                        period: model_period,
+                        concurrency: model_concurrency,
+                    }
                 };
 
-                if super::is_schedulable(taskset, &model).is_schedulable() {
-                    Some(model)
+                if analysis.is_schedulable(taskset).is_ok() {
+                    Some(analysis.model)
                 } else {
                     None
                 }

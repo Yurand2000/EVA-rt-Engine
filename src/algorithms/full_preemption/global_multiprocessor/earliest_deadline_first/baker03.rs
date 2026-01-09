@@ -22,41 +22,52 @@
 //!    doi: 10.1109/ECRTS.2005.18.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Multiprocessor EDF (Baker 2003)";
 
 /// Multiprocessor EDF - Baker 2003 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
-    }
+pub struct Analysis {
+    pub num_processors: u64,
+}
 
-    // Theorem 5 [2]
-    fn beta(task_i: &RTTask, task_k: &RTTask) -> f64 {
-        let b0 = task_i.utilization() * (1.0 + (task_i.period - task_i.deadline) / task_k.deadline);
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
 
-        if task_k.density() >= task_i.utilization() {
-            b0
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
         } else {
-            b0 + (task_i.wcet - task_k.density() * task_i.period) / task_k.deadline
+            Ok(())
         }
     }
 
-    // Theorem 5 [2]
-    let schedulable =
-        taskset.iter()
-        .all(|task_k| {
-            taskset.iter()
-                .map(|task_i| f64::min(1.0, beta(task_i, task_k)))
-                .sum::<f64>()
-            <=
-            num_processors as f64 * (1.0 - task_k.density()) + task_k.density()
-        });
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // Theorem 5 [2]
+        fn beta(task_i: &RTTask, task_k: &RTTask) -> f64 {
+            let b0 = task_i.utilization() * (1.0 + (task_i.period - task_i.deadline) / task_k.deadline);
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+            if task_k.density() >= task_i.utilization() {
+                b0
+            } else {
+                b0 + (task_i.wcet - task_k.density() * task_i.period) / task_k.deadline
+            }
+        }
+
+        // Theorem 5 [2]
+        let schedulable =
+            taskset.iter()
+            .all(|task_k| {
+                taskset.iter()
+                    .map(|task_i| f64::min(1.0, beta(task_i, task_k)))
+                    .sum::<f64>()
+                <=
+                self.num_processors as f64 * (1.0 - task_k.density()) + task_k.density()
+            });
+
+        SchedError::result_from_schedulable(schedulable)
+    }
 }
 
 #[test]
@@ -70,6 +81,6 @@ fn gfb_bak_example() {
 
     let num_processors = 2;
 
-    assert!(super::gbf03::is_schedulable_sporadic(&taskset, num_processors).is_schedulable());
-    assert!(self::is_schedulable(&taskset, num_processors).is_not_schedulable());
+    assert!(super::gbf03::AnalysisSporadic { num_processors }.is_schedulable(&taskset).is_ok());
+    assert!(Analysis { num_processors }.is_schedulable(&taskset).is_err());
 }

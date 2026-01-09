@@ -8,7 +8,7 @@
 //! - Implicit Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | linear *O(n)* complexity
 //!
 //! ---
@@ -18,20 +18,30 @@
 //!    Jan. 1973, doi: 10.1145/321738.321743.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Earliest Deadline First (Liu & Layland 1973)";
 
 /// Earliest Deadline First, Liu & Layland 1973 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
-    if !RTUtils::implicit_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).implicit_deadlines();
+pub struct Analysis;
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::implicit_deadlines(taskset) {
+            Err(SchedError::implicit_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    let total_utilization = RTUtils::total_utilization(taskset);
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        let total_utilization = RTUtils::total_utilization(taskset);
 
-    SchedResultFactory(ALGORITHM)
-        .is_schedulable(total_utilization <= 1f64)
+        SchedError::result_from_schedulable(
+            total_utilization <= 1f64
+        )
+    }
 }

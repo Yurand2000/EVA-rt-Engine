@@ -8,9 +8,9 @@
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | O(*n^2*) complexity
-//! - [`generate_model_linear`] \
+//! - [`DesignerLinear::design`] \
 //!   | O(*n^2*) complexity
 //! - [`extra::generate_model`] \
 //!   | pseudo-polynomial complexity
@@ -33,21 +33,33 @@ const ALGORITHM: &str = "MPR Model, FP Local Scheduler (*Derived from* Bertogna,
 /// MPR Model, FP Local Scheduler - *Derived from* Bertogna, Cirinei, Lipari 2009 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis {
+    pub model: MPRModel,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    let schedulable =
-        is_schedulable_demand(
-            taskset,
-            model,
-            |taskset, k, task_k, _, _|
-                demand_fp(taskset, k, task_k, model.concurrency),
-            |_, _, _, _| Box::new(std::iter::once(Time::zero())),
-        );
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        let schedulable =
+            is_schedulable_demand(
+                taskset,
+                &self.model,
+                |taskset, k, task_k, _, _|
+                    demand_fp(taskset, k, task_k, self.model.concurrency),
+                |_, _, _, _| Box::new(std::iter::once(Time::zero())),
+            );
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+        SchedError::result_from_schedulable(schedulable)
+    }
 }
 
 /// MPR Model, FP Local Scheduler - *Derived from* Bertogna, Cirinei, Lipari 2009 \[1\]
@@ -56,26 +68,33 @@ pub fn is_schedulable(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
 /// period and maxmimum cuncurrency.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn generate_model_linear(
-    taskset: &[RTTask],
-    model_period: Time,
-    model_concurrency: u64,
-) -> DesignResult<MPRModel> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return DesignResultFactory(ALGORITHM).constrained_deadlines();
+pub struct DesignerLinear {
+    pub period: Time,
+    pub concurrency: u64,
+}
+
+impl SchedDesign<&[RTTask], MPRModel> for DesignerLinear {
+    fn designer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    let model =
+    fn run_designer(&self, taskset: &[RTTask]) -> Result<MPRModel, SchedError> {
         generate_model_from_demand_linear(
             taskset,
-            model_period,
-            model_concurrency,
+            self.period,
+            self.concurrency,
             |taskset, k, task_k, _, concurrency, _|
                 demand_fp(taskset, k, task_k, concurrency),
             |_, _, _, _, _| Box::new(std::iter::once(Time::zero())),
-        );
-
-    DesignResultFactory(ALGORITHM).from_option(model)
+        )
+        .ok_or(SchedError::NonSchedulable(None))
+    }
 }
 
 fn demand_fp(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
@@ -94,53 +113,43 @@ pub mod extra {
     /// period and maxmimum cuncurrency.
     ///
     /// Refer to the [module](`self`) level documentation.
-    pub fn generate_model(
-        taskset: &[RTTask],
-        model_period: Time,
-        model_concurrency: u64,
-        resource_step: Time,
-    ) -> DesignResult<MPRModel> {
-        if !RTUtils::constrained_deadlines(taskset) {
-            return DesignResultFactory(super::ALGORITHM).constrained_deadlines();
-        }
-
-        __generate_model(taskset, model_period, model_concurrency, resource_step)
+    pub struct DesignerPeriodConcurrencyNaive {
+        pub period: Time,
+        pub concurrency: u64,
+        pub resource_step: Time,
     }
 
-    fn __generate_model(
-        taskset: &[RTTask],
-        model_period: Time,
-        model_concurrency: u64,
-        resource_step: Time,
-    ) -> DesignResult<MPRModel> {
-        let min_feasible_resource =
-            RTUtils::total_utilization(taskset) * model_period;
-        let max_feasible_resource_model =
-            super::generate_model_linear(taskset, model_period, model_concurrency);
+    impl SchedDesign<&[RTTask], MPRModel> for DesignerPeriodConcurrencyNaive<> {
+        fn designer_name(&self) -> &str { super::ALGORITHM }
 
-        if !max_feasible_resource_model.is_successful() {
-            return max_feasible_resource_model;
+        fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+            if !RTUtils::constrained_deadlines(taskset) {
+                Err(SchedError::constrained_deadlines())
+            } else {
+                Ok(())
+            }
         }
 
-        let max_feasible_resource = max_feasible_resource_model.result.unwrap().resource;
+        fn run_designer(&self, taskset: &[RTTask]) -> Result<MPRModel, SchedError> {
+            let min_resource =
+                RTUtils::total_utilization(taskset) * self.period;
+            let max_resource = {
+                let designer = super::DesignerLinear { period: self.period, concurrency: self.concurrency };
 
-        let best_model =
-            time_range_iterator_w_step(min_feasible_resource, max_feasible_resource, resource_step)
-            .find_map(|resource| {
-                let model = MPRModel {
-                    resource,
-                    period: model_period,
-                    concurrency: model_concurrency,
-                };
+                designer.check_preconditions(&taskset)?;
+                designer.run_designer(taskset)?.resource
+            };
 
-                if super::is_schedulable(taskset, &model).is_schedulable() {
-                    Some(model)
-                } else {
-                    None
-                }
-            });
-
-        DesignResultFactory(super::ALGORITHM).from_option(best_model)
+            (super::super::super::extra::DesignerPeriodConcurrencyNaive {
+                period: self.period,
+                concurrency: self.concurrency,
+                resource_range: (min_resource, max_resource, self.resource_step),
+                analysis_gen_fn: |resource, period, concurrency|
+                    super::Analysis { model: MPRModel { resource, period, concurrency }},
+                marker: std::marker::PhantomData,
+            })
+            .run_designer(taskset)
+        }
     }
 
     /// MPR Model, FP Local Scheduler - *Derived from* Bertogna, Cirinei, Lipari 2009 \[1\]

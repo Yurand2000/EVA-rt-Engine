@@ -8,9 +8,9 @@
 //! - Implicit Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | pseudo-polynomial complexity
-//! - [`generate_model_linear`] \
+//! - [`DesignerLinear::design`] \
 //!   | Generate the suitable interface given the taskset and the [`PRModel`]'s period. \
 //!   | \
 //!   | pseudo-polynomial complexity
@@ -23,49 +23,70 @@
 
 use crate::prelude::*;
 use crate::algorithms::full_preemption::uniprocessor::hierarchical::pr_model03::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Periodic Resource Model, EDF Local Scheduling (Shin & Lee 2003)";
 
 /// Periodic Resource Model, EDF Local Scheduling - Shin & Lee 2003 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<()> {
-    if !RTUtils::implicit_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).implicit_deadlines();
+pub struct Analysis {
+    pub model: PRModel,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::implicit_deadlines(taskset) {
+            Err(SchedError::implicit_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    // Equation 9 [1]
-    let schedulable =
-        is_schedulable_demand(
-            taskset,
-            model,
-            demand,
-            time_intervals
-        );
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // Equation 9 [1]
+        let schedulable =
+            is_schedulable_demand(
+                taskset,
+                &self.model,
+                demand,
+                time_intervals
+            );
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+        SchedError::result_from_schedulable(schedulable)
+    }
 }
 
 /// Periodic Resource Model, EDF Local Scheduling - Shin & Lee 2003 \[1\] \
 /// Derive the best [`PRModel`] using demand analysis.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn generate_model_linear(taskset: &[RTTask], model_period: Time) -> DesignResult<PRModel> {
-    if !RTUtils::implicit_deadlines(taskset) {
-        return DesignResultFactory(ALGORITHM).implicit_deadlines();
+pub struct DesignerLinear {
+    period: Time
+}
+
+impl SchedDesign<&[RTTask], PRModel> for DesignerLinear {
+    fn designer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::implicit_deadlines(taskset) {
+            Err(SchedError::implicit_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
+    fn run_designer(&self, taskset: &[RTTask]) -> Result<PRModel, SchedError> {
     // Equation 16 [1]
-    let model =
         generate_model_from_demand_linear(
             taskset,
-            model_period,
+            self.period,
             demand,
             time_intervals
-        );
-
-    DesignResultFactory(ALGORITHM).from_option(model)
+        )
+        .ok_or(SchedError::NonSchedulable(None))
+    }
 }
 
 // Section 4.1 [1]

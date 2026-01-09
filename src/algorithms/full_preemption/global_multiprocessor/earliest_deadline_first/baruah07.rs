@@ -8,10 +8,10 @@
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | pseudo-polynomial complexity
-//! - [`is_schedulable_simple`] \
-//!   | Worse runtime than [`is_schedulable`], checks unnecessary timesteps. \
+//! - [`AnalysisSimple::is_schedulable`] \
+//!   | Worse runtime than [`Analysis::is_schedulable`], checks unnecessary timesteps. \
 //!   | \
 //!   | pseudo-polynomial complexity
 //!
@@ -22,62 +22,89 @@
 //!    Tucson, AZ, USA: IEEE, Dec. 2007, pp. 119–128. doi: 10.1109/RTSS.2007.35.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Multiprocessor EDF (Baruah 2007)";
 
 /// Multiprocessor EDF - Baruah 2007 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
-    }
-
-    // As in [1]: It can also be shown that Condition 8 need only be tested at
-    // those values of Ak at which DBF(tak_i, Ak
-    // + Dk) (and DBF') changes for some task_i.
-    //
-    // Both functions change their output value on a periodic pattern: let C <=
-    // D <= T, for task i where to compute the DBFs. The values change in the
-    // range [0 + aT, C + aT] and at {D + aT} for all integers a. The union of
-    // these ranges is the points where we actually need to perform the test.
-    let schedulable =
-        taskset.iter().enumerate().all(|(k, task_k)| {
-            let ak_upperbound = arrival_k_upperbound(taskset, task_k, num_processors).ceil();
-
-            (0 ..= ak_upperbound.ceil().as_nanos() as usize)
-                .map(|arrival_k| Time::nanos(arrival_k as f64))
-                .filter(|arrival_k| {
-                    // Perform the test only where DBF/DBF' values change.
-                    taskset.iter().any(|task_i| {
-                        let interval = *arrival_k + task_k.deadline;
-                        let modulus = interval % task_i.period;
-
-                        modulus <= task_i.wcet || modulus == task_i.deadline
-                    })
-                })
-                .all(|arrival_k| baruah_test_single(taskset, k, task_k, arrival_k, num_processors))
-        });
-
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+pub struct Analysis {
+    pub num_processors: u64,
 }
 
-pub fn is_schedulable_simple(taskset: &[RTTask], num_processors: u64) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        check_preconditions(taskset)
     }
 
-    let schedulable =
-        taskset.iter().enumerate().all(|(k, task_k)| {
-            let ak_upperbound = arrival_k_upperbound(taskset, task_k, num_processors).ceil();
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // As in [1]: It can also be shown that Condition 8 need only be tested at
+        // those values of Ak at which DBF(tak_i, Ak
+        // + Dk) (and DBF') changes for some task_i.
+        //
+        // Both functions change their output value on a periodic pattern: let C <=
+        // D <= T, for task i where to compute the DBFs. The values change in the
+        // range [0 + aT, C + aT] and at {D + aT} for all integers a. The union of
+        // these ranges is the points where we actually need to perform the test.
+        let schedulable =
+            taskset.iter().enumerate().all(|(k, task_k)| {
+                let ak_upperbound = arrival_k_upperbound(taskset, task_k, self.num_processors).ceil();
 
-            (0 ..= ak_upperbound.ceil().as_nanos() as usize)
-                .map(|arrival_k| Time::nanos(arrival_k as f64))
-                .all(|arrival_k| baruah_test_single(taskset, k, task_k, arrival_k, num_processors))
-        });
+                (0 ..= ak_upperbound.ceil().as_nanos() as usize)
+                    .map(|arrival_k| Time::nanos(arrival_k as f64))
+                    .filter(|arrival_k| {
+                        // Perform the test only where DBF/DBF' values change.
+                        taskset.iter().any(|task_i| {
+                            let interval = *arrival_k + task_k.deadline;
+                            let modulus = interval % task_i.period;
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+                            modulus <= task_i.wcet || modulus == task_i.deadline
+                        })
+                    })
+                    .all(|arrival_k| baruah_test_single(taskset, k, task_k, arrival_k, self.num_processors))
+            });
+
+        SchedError::result_from_schedulable(schedulable)
+    }
+}
+
+/// Multiprocessor EDF - Baruah 2007 \[1\]
+///
+/// Refer to the [module](`self`) level documentation.
+pub struct AnalysisSimple {
+    pub num_processors: u64,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for AnalysisSimple {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        check_preconditions(taskset)
+    }
+
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+
+        let schedulable =
+            taskset.iter().enumerate().all(|(k, task_k)| {
+                let ak_upperbound = arrival_k_upperbound(taskset, task_k, self.num_processors).ceil();
+
+                (0 ..= ak_upperbound.ceil().as_nanos() as usize)
+                    .map(|arrival_k| Time::nanos(arrival_k as f64))
+                    .all(|arrival_k| baruah_test_single(taskset, k, task_k, arrival_k, self.num_processors))
+            });
+
+        SchedError::result_from_schedulable(schedulable)
+    }
+}
+
+fn check_preconditions(taskset: &[RTTask]) -> Result<(), SchedError> {
+    if !RTUtils::constrained_deadlines(taskset) {
+        Err(SchedError::constrained_deadlines())
+    } else {
+        Ok(())
+    }
 }
 
 // Section 5, Theorem 2, Equation 8 [1]
@@ -158,7 +185,7 @@ pub fn simple_vs_optimized() {
     let num_processors = 1;
 
     assert_eq!(
-        is_schedulable(&taskset, num_processors).is_schedulable(),
-        is_schedulable_simple(&taskset, num_processors).is_schedulable()
+        Analysis { num_processors }.is_schedulable(&taskset).is_ok(),
+        AnalysisSimple { num_processors }.is_schedulable(&taskset).is_ok()
     );
 }

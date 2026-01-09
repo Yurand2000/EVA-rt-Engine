@@ -19,29 +19,40 @@
 //!    553–566, Apr. 2009, doi: 10.1109/TPDS.2008.129.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Multiprocessor EDF (Bertogna, Cirinei, Lipari 2009)";
 
 /// Multiprocessor EDF - Bertogna, Cirinei, Lipari 2009
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis {
+    pub num_processors: u64,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    // Theorem 7 [1]
-    // Section 4 Equation 9
-    let schedulable =
-        taskset.iter().enumerate()
-        .all(|(k, task_k)| {
-            global_earliest_deadline_first_demand(taskset, k, task_k)
-                <
-            num_processors as f64 * (task_k.laxity() + Time::one())
-        });
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // Theorem 7 [1]
+        // Section 4 Equation 9
+        let schedulable =
+            taskset.iter().enumerate()
+            .all(|(k, task_k)| {
+                global_earliest_deadline_first_demand(taskset, k, task_k)
+                    <
+                self.num_processors as f64 * (task_k.laxity() + Time::one())
+            });
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+        SchedError::result_from_schedulable(schedulable)
+    }
 }
 
 pub fn global_earliest_deadline_first_demand(taskset: &[RTTask], k: usize, task_k: &RTTask) -> Time {
@@ -93,8 +104,8 @@ fn example_1() {
 
     let num_processors = 2;
 
-    assert!(super::gbf03::is_schedulable_sporadic(&taskset, num_processors).is_not_schedulable());
-    assert!(is_schedulable(&taskset, num_processors).is_schedulable());
+    assert!(super::gbf03::AnalysisSporadic { num_processors }.is_schedulable(&taskset).is_err());
+    assert!(Analysis { num_processors }.is_schedulable(&taskset).is_ok());
 }
 
 #[test]

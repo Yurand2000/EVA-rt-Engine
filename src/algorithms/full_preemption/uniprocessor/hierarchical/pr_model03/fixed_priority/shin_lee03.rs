@@ -8,9 +8,9 @@
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | pseudo-polynomial complexity
-//! - [`generate_model_linear`] \
+//! - [`DesignerLinear::design`] \
 //!   | Generate the suitable interface given the taskset and the [`PRModel`]'s period. \
 //!   | \
 //!   | O(*n*) complexity
@@ -23,29 +23,35 @@
 
 use crate::prelude::*;
 use crate::algorithms::full_preemption::uniprocessor::hierarchical::pr_model03::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Periodic Resource Model, Fixed Priority Local Scheduling (Shin & Lee 2003)";
 
 /// Periodic Resource Model, Fixed Priority Local Scheduling - Shin & Lee 2003 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Time>> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis {
+    pub model: PRModel,
+}
+
+impl SchedAnalysis<Vec<Time>, &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    // Equation 14 [1]
-    let result =
+    fn run_test(&self, taskset: &[RTTask]) -> Result<Vec<Time>, SchedError> {
+        // Equation 14 [1]
         is_schedulable_response(
             taskset,
-            model,
+            &self.model,
             rta,
-        );
-
-    SchedResult {
-        test_name: ALGORITHM.to_owned(),
-        result: result.map_err(|err| SchedError::NonSchedulable(Some(err))),
+        )
+        .map_err(|err| SchedError::NonSchedulable(Some(err)))
     }
 }
 
@@ -53,16 +59,30 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Ti
 /// Derive the best [`PRModel`] using demand analysis.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn generate_model_linear(taskset: &[RTTask], model_period: Time) -> DesignResult<PRModel> {
-    // Equations 23, 24 [1]
-    let model =
+pub struct DesignerLinear {
+    period: Time
+}
+
+impl SchedDesign<&[RTTask], PRModel> for DesignerLinear {
+    fn designer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn run_designer(&self, taskset: &[RTTask]) -> Result<PRModel, SchedError> {
+        // Equations 23, 24 [1]
         generate_model_from_response_linear(
             taskset,
-            model_period,
+            self.period,
             rta
-        );
-
-    DesignResultFactory(ALGORITHM).from_option(model)
+        )
+        .ok_or(SchedError::NonSchedulable(None))
+    }
 }
 
 // Equation 10 [1]

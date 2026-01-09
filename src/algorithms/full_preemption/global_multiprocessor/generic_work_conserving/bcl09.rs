@@ -8,7 +8,7 @@
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | O(*n^2*) complexity
 //!
 //! ---
@@ -19,29 +19,40 @@
 //!    553–566, Apr. 2009, doi: 10.1109/TPDS.2008.129.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Multiprocessor Work Conserving (Bertogna, Cirinei, Lipari 2009)";
 
 /// Multiprocessor Work Conserving - Bertogna, Cirinei, Lipari 2009
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], num_processors: u64) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis {
+    pub num_processors: u64,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    // Theorem 6 [1]
-    // Section 4 Equation 7
-    let schedulable =
-        taskset.iter().enumerate()
-        .all(|(k, task_k)| {
-            work_conserving_demand(taskset, k, task_k)
-                <=
-            num_processors as f64 * (task_k.laxity() + Time::one())
-        });
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // Theorem 6 [1]
+        // Section 4 Equation 7
+        let schedulable =
+            taskset.iter().enumerate()
+            .all(|(k, task_k)| {
+                work_conserving_demand(taskset, k, task_k)
+                    <=
+                self.num_processors as f64 * (task_k.laxity() + Time::one())
+            });
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+        SchedError::result_from_schedulable(schedulable)
+    }
 }
 
 fn work_conserving_demand(taskset: &[RTTask], k: usize, task_k: &RTTask) -> Time {

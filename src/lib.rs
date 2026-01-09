@@ -16,12 +16,12 @@
 pub mod prelude {
     pub use eva_rt_common::prelude::*;
     pub use eva_rt_common::utils::prelude::*;
-    pub use super::algorithms::prelude::*;
     pub use super::utils::{
         binary_search::*,
         fixpoint_search::*,
-        sched_result::*,
-        design_result::*,
+        sched_error::*,
+        sched_analysis::*,
+        sched_design::*,
         time_iterators::*,
     };
 }
@@ -32,7 +32,8 @@ pub mod algorithms;
 pub mod utils {
     pub mod binary_search;
     pub mod fixpoint_search;
-    pub mod sched_result;
-    pub mod design_result;
+    pub mod sched_error;
+    pub mod sched_analysis;
+    pub mod sched_design;
     pub mod time_iterators;
 }

@@ -8,7 +8,7 @@
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | pseudo-polynomial complexity
 //! - [`generate_model_linear`] \
 //!   | pseudo-polynomial complexity
@@ -34,60 +34,85 @@ const ALGORITHM: &str = "MPR Model, EDF Local Scheduler (Shin, Easwaran, Lee 200
 /// MPR Model, EDF Local Scheduler - Shin, Easwaran, Lee 2009 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
-    }
-
-    if f64::abs(model.utilization() - RTUtils::total_utilization(taskset)) < 0.01 {
-        return SchedResultFactory(ALGORITHM).other(
-            anyhow::format_err!("Arrival times upperbound tends to infinity, the computation becomes intractable.")
-        );
-    }
-
-    // Section 4.2, Theorem 1 [1]
-    let schedulable =
-        is_schedulable_demand(
-            taskset,
-            model,
-            |taskset, k, task_k, model, arrival_k|
-                demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
-            |taskset, _, task_k, model| -> Box<dyn Iterator<Item = Time>> {
-                let arrival_k_upperbound =
-                    arrival_k_upperbound_edf(taskset, task_k, model);
-
-                Box::new(
-                    time_range_iterator(Time::zero(), arrival_k_upperbound)
-                    .filter(|arrival_k| filter_intervals_edf(taskset, task_k, model, *arrival_k))
-                )
-            }
-        );
-
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+pub struct Analysis {
+    pub model: MPRModel,
 }
 
-#[allow(unused)]
-fn is_schedulable_simple(taskset: &[RTTask], model: &MPRModel) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else if f64::abs(self.model.utilization() - RTUtils::total_utilization(taskset)) < 0.01 {
+            Err(SchedError::Other(
+                anyhow::format_err!("Arrival times upperbound tends to infinity, the computation becomes intractable.")
+            ))
+        } else {
+            Ok(())
+        }
     }
 
-    // Section 4.2, Theorem 1 [1]
-    let schedulable =
-        is_schedulable_demand(
-            taskset,
-            model,
-            |taskset, k, task_k, model, arrival_k|
-                demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
-            |taskset, _, task_k, model|  {
-                let arrival_k_upperbound =
-                    arrival_k_upperbound_edf(taskset, task_k, model);
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // Section 4.2, Theorem 1 [1]
+        let schedulable =
+            is_schedulable_demand(
+                taskset,
+                &self.model,
+                |taskset, k, task_k, model, arrival_k|
+                    demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
+                |taskset, _, task_k, model| -> Box<dyn Iterator<Item = Time>> {
+                    let arrival_k_upperbound =
+                        arrival_k_upperbound_edf(taskset, task_k, model);
 
-                Box::new(time_range_iterator(Time::zero(), arrival_k_upperbound))
-            }
-        );
+                    Box::new(
+                        time_range_iterator(Time::zero(), arrival_k_upperbound)
+                        .filter(|arrival_k| filter_intervals_edf(taskset, task_k, model, *arrival_k))
+                    )
+                }
+            );
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+        SchedError::result_from_schedulable(schedulable)
+    }
+}
+
+
+/// MPR Model, EDF Local Scheduler - Shin, Easwaran, Lee 2009 \[1\]
+///
+/// Refer to the [module](`self`) level documentation.
+pub struct AnalysisSimple {
+    pub model: MPRModel,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for AnalysisSimple {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // Section 4.2, Theorem 1 [1]
+        let schedulable =
+            is_schedulable_demand(
+                taskset,
+                &self.model,
+                |taskset, k, task_k, model, arrival_k|
+                    demand_edf(taskset, k, task_k, model.concurrency, arrival_k),
+                |taskset, _, task_k, model|  {
+                    let arrival_k_upperbound =
+                        arrival_k_upperbound_edf(taskset, task_k, model);
+
+                    Box::new(time_range_iterator(Time::zero(), arrival_k_upperbound))
+                }
+            );
+
+        SchedError::result_from_schedulable(schedulable)
+    }
 }
 
 /// MPR Model, EDF Local Scheduler - Shin, Easwaran, Lee 2009 \[1\]
@@ -349,14 +374,16 @@ pub mod extra {
         let best_model =
             time_range_iterator_w_step(min_feasible_resource, max_feasible_resource, resource_step)
             .find_map(|resource| {
-                let model = MPRModel {
-                    resource,
-                    period: model_period,
-                    concurrency: model_concurrency,
+                let analysis = super::Analysis {
+                    model: MPRModel {
+                        resource,
+                        period: model_period,
+                        concurrency: model_concurrency,
+                    }
                 };
 
-                if super::is_schedulable(taskset, &model).is_schedulable() {
-                    Some(model)
+                if analysis.is_schedulable(taskset).is_ok() {
+                    Some(analysis.model)
                 } else {
                     None
                 }
@@ -432,7 +459,7 @@ pub fn simple_vs_optimized() {
         concurrency: 2,
     };
 
-    let optimized_test = is_schedulable(&taskset, &model);
-    let simple_test = is_schedulable_simple(&taskset, &model);
-    assert_eq!(optimized_test.is_schedulable(), simple_test.is_schedulable());
+    let optimized_test = Analysis { model: model.clone() }.is_schedulable(&taskset);
+    let simple_test = AnalysisSimple { model: model }.is_schedulable(&taskset);
+    assert_eq!(optimized_test.is_ok(), simple_test.is_ok());
 }

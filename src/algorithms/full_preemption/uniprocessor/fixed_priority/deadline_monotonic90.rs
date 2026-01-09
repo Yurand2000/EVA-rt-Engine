@@ -9,7 +9,7 @@
 //! - Deadline Monotonic priority assigment
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | linear *O(n^2)* complexity
 //!
 //! ---
@@ -17,43 +17,50 @@
 //! 1. N. C. Audsley, “Deadline Monotonic Scheduling,” Sept. 1990.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Fixed Priority DM (Audsley 1990)";
 
 /// Fixed Priority Deadline Monotonic, Audsley 1990 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis;
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else if !RTUtils::is_taskset_sorted_by_deadline(taskset) {
+            Err(SchedError::deadline_monotonic())
+        } else {
+            Ok(())
+        }
     }
 
-    if !RTUtils::is_taskset_sorted_by_deadline(taskset) {
-        return SchedResultFactory(ALGORITHM).deadline_monotonic();
-    }
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // Equation 8 [1]
+        #[inline(always)]
+        fn interference(taskset: &[RTTask]) -> Time {
+            if taskset.len() == 0 {
+                return Time::zero();
+            }
 
-    // Equation 8
-    #[inline(always)]
-    fn interference(taskset: &[RTTask]) -> Time {
-        if taskset.len() == 0 {
-            return Time::zero();
+            let last_task = taskset.last().unwrap();
+
+            taskset.iter()
+                .take(taskset.len() - 1)
+                .map(|task| (last_task.deadline / task.period).ceil() * task.wcet)
+                .sum()
         }
 
-        let last_task = taskset.last().unwrap();
+        // Equation 8 [1]
+        let schedulable =
+            taskset.iter().enumerate()
+            .all(|(i, task)| {
+                task.wcet + interference(&taskset[0..=i]) <= task.deadline
+            });
 
-        taskset.iter()
-            .take(taskset.len() - 1)
-            .map(|task| (last_task.deadline / task.period).ceil() * task.wcet)
-            .sum()
+        SchedError::result_from_schedulable(schedulable)
     }
-
-    // Equation 8
-    let schedulable =
-        taskset.iter().enumerate()
-        .all(|(i, task)| {
-            task.wcet + interference(&taskset[0..=i]) <= task.deadline
-        });
-
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
 }

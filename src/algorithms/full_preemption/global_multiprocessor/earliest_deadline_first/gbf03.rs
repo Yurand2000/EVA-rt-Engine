@@ -8,11 +8,11 @@
 //! - Implicit/Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`gfb_test_periodic`] \
+//! - [`AnalysisPeriodic::is_schedulable`] \
 //!   | Periodic Task Model \
 //!   | Implicit Deadlines \
 //!   | linear O(*n*) complexity
-//! - [`gfb_test_sporadic`] \
+//! - [`AnalysisSporadic::is_schedulable`] \
 //!   | Sporadic Task Model \
 //!   | Constrained Deadlines \
 //!   | linear O(*n*) complexity
@@ -28,42 +28,65 @@
 //!    doi: 10.1109/ECRTS.2005.18.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Multiprocessor EDF (Goossens, Funk, Baruah 2003)";
 
 /// Multiprocessor EDF, Periodic tasks - Goossens, Funk, Baruah 2003 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable_periodic(taskset: &[RTTask], num_processors: u64) -> SchedResult<()> {
-    if !RTUtils::implicit_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).implicit_deadlines();
+pub struct AnalysisPeriodic {
+    pub num_processors: u64,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for AnalysisPeriodic {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::implicit_deadlines(taskset) {
+            Err(SchedError::implicit_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    let u_tot = RTUtils::total_utilization(taskset);
-    let u_max = RTUtils::largest_utilization(taskset);
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        let u_tot = RTUtils::total_utilization(taskset);
+        let u_max = RTUtils::largest_utilization(taskset);
 
-    // Theorem 3 [2]
-    let schedulable =
-        u_tot <= (num_processors as f64) - u_max * (num_processors as f64 - 1f64);
+        // Theorem 3 [2]
+        let schedulable =
+            u_tot <= (self.num_processors as f64) - u_max * (self.num_processors as f64 - 1f64);
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+        SchedError::result_from_schedulable(schedulable)
+    }
 }
 
 /// Multiprocessor EDF, Sporadic tasks - Goossens, Funk, Baruah 2003 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable_sporadic(taskset: &[RTTask], num_processors: u64) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct AnalysisSporadic {
+    pub num_processors: u64,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for AnalysisSporadic {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    let d_tot = RTUtils::total_density(taskset);
-    let d_max = RTUtils::largest_density(taskset);
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        let d_tot = RTUtils::total_density(taskset);
+        let d_max = RTUtils::largest_density(taskset);
 
-    // Theorem 4 [2]
-    let schedulable =
-        d_tot <= (num_processors as f64) - d_max * (num_processors as f64 - 1f64);
+        // Theorem 4 [2]
+        let schedulable =
+            d_tot <= (self.num_processors as f64) - d_max * (self.num_processors as f64 - 1f64);
 
-    SchedResultFactory(ALGORITHM).is_schedulable(schedulable)
+        SchedError::result_from_schedulable(schedulable)
+    }
 }

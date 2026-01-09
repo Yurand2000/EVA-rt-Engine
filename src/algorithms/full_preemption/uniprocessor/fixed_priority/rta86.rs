@@ -8,7 +8,7 @@
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | pseudo-polynomial complexity
 //!
 //! ---
@@ -17,7 +17,6 @@
 //!    Comput J, vol. 29, no. 5, pp. 390–395, 1986, doi: 10.1093/comjnl/29.5.390.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "RTA (Joseph & Pandya 1986)";
 
@@ -27,34 +26,37 @@ const ALGORITHM: &str = "RTA (Joseph & Pandya 1986)";
 ///
 /// Returns:
 /// - Worst-Case Response Times of each task.
-pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<Vec<Time>> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis;
+
+impl SchedAnalysis<Vec<Time>, &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else if !avg_processing_load_is_met(taskset) {
+            Err(SchedError::Precondition(Some(
+                anyhow::format_err!("average processing load is not met."))))
+        } else {
+            Ok(())
+        }
     }
 
-    if !avg_processing_load_is_met(taskset) {
-        return SchedResultFactory(ALGORITHM).non_schedulable_reason(
-            anyhow::format_err!("average processing load is not met."));
+    fn run_test(&self, taskset: &[RTTask]) -> Result<Vec<Time>, SchedError> {
+        taskset.iter().enumerate()
+            .map(|(i, task)| {
+                let response_time = response_time(&taskset[0..=i]);
+
+                if response_time > task.deadline {
+                    Err(SchedError::NonSchedulable(Some(
+                        anyhow::format_err!("task {i} misses its deadline.")
+                    )))
+                } else {
+                    Ok(response_time)
+                }
+            })
+            .collect()
     }
-
-    match taskset.iter().enumerate()
-        .map(|(i, task)| {
-            let response_time = response_time(&taskset[0..=i]);
-
-            if response_time > task.deadline {
-                Err(anyhow::format_err!("task {i} misses its deadline."))
-            } else {
-                Ok(response_time)
-            }
-        })
-        .collect()
-    {
-        Ok(response_times) =>
-            SchedResultFactory(ALGORITHM).schedulable(response_times),
-        Err(error) =>
-            SchedResultFactory(ALGORITHM).non_schedulable_reason(error),
-    }
-
 }
 
 // Condition 4 [1]
@@ -112,5 +114,5 @@ fn example_2() {
     assert_eq!(response_time(&taskset[0..=3]), Time::nanos(2490.0));
     assert_eq!(response_time(&taskset[0..=4]), Time::nanos(6991.0));
 
-    assert!(is_schedulable(&taskset).is_not_schedulable());
+    assert!(Analysis.is_schedulable(&taskset).is_err());
 }

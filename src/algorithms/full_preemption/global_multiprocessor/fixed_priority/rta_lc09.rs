@@ -8,7 +8,7 @@
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | pseudo-polynomial complexity
 //!
 //! ---
@@ -18,30 +18,43 @@
 //!    Symposium, Dec. 2009, pp. 387–397. doi: 10.1109/RTSS.2009.11.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Multiprocessor FP Response Time Analysis (Guan, Stigge, Yi, Yu 2009)";
 
 /// Multiprocessor FP Response Time Analysis - Guan, Stigge, Yi, Yu 2009 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], cpus: usize) -> SchedResult<()> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis {
+    pub num_processors: u64,
+}
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    let mut task_rts = vec![Time::zero(); taskset.len()];
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        let mut task_rts = vec![Time::zero(); taskset.len()];
 
-    for (k, task_k) in taskset.iter().enumerate() {
-        let task_k_rt = response_time(taskset, k, cpus, &task_rts[0..k]);
-        if task_k_rt > task_k.deadline {
-            return SchedResultFactory(ALGORITHM).non_schedulable();
+        for (k, task_k) in taskset.iter().enumerate() {
+            let task_k_rt = response_time(taskset, k, self.num_processors, &task_rts[0..k]);
+            if task_k_rt > task_k.deadline {
+                return Err(SchedError::NonSchedulable(Some(
+                    anyhow::format_err!("task {k} misses its deadline.")
+                )));
+            }
+
+            task_rts[k] = task_k_rt;
         }
 
-        task_rts[k] = task_k_rt;
+        Ok(())
     }
-
-    SchedResultFactory(ALGORITHM).schedulable(())
 }
 
 // Equation 5 [1]
@@ -82,7 +95,7 @@ fn interference_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTask, task_
 }
 
 // Equation 9 [1]
-fn total_interference(interval: Time, cpus: usize, taskset: &[RTTask], k: usize, task_rts: &[Time]) -> Time {
+fn total_interference(interval: Time, cpus: u64, taskset: &[RTTask], k: usize, task_rts: &[Time]) -> Time {
     assert!(task_rts.len() == k);
 
     let interferences_non_carry_in: Vec<_> =
@@ -105,11 +118,11 @@ fn total_interference(interval: Time, cpus: usize, taskset: &[RTTask], k: usize,
     interference_diffs.sort_unstable();
 
     interferences_non_carry_in.into_iter().sum::<Time>() +
-        interference_diffs.into_iter().rev().take(cpus - 1).sum::<Time>()
+        interference_diffs.into_iter().rev().take(cpus as usize - 1).sum::<Time>()
 }
 
 // Equation 12 [1]
-fn response_time(taskset: &[RTTask], k: usize, cpus: usize, task_rts: &[Time]) -> Time {
+fn response_time(taskset: &[RTTask], k: usize, cpus: u64, task_rts: &[Time]) -> Time {
     let mut prev_x = taskset[k].wcet;
     let mut x;
     loop {

@@ -8,7 +8,7 @@
 //! - Constrained Deadlines
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | pseudo-polynomial complexity
 //!
 //! ---
@@ -20,20 +20,29 @@
 
 use crate::prelude::*;
 use crate::algorithms::full_preemption::uniprocessor::hierarchical::pr_model03::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Periodic Resource Model, Fixed Priority Local Scheduling (* 2026)";
 
 /// Periodic Resource Model, Fixed Priority Local Scheduling - * 2026 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Time>> {
-    if !RTUtils::constrained_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).constrained_deadlines();
+pub struct Analysis {
+    pub model: PRModel,
+}
+
+impl SchedAnalysis<Vec<Time>, &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else {
+            Ok(())
+        }
     }
 
-    // Equation 14 [2]
-    let result: Result<Vec<_>, _> =
+    fn run_test(&self, taskset: &[RTTask]) -> Result<Vec<Time>, SchedError> {
+        // Equation 14 [2]
         taskset.iter().enumerate()
         .map(|(k, task_k)| {
             let response =
@@ -41,7 +50,7 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Ti
                     task_k.wcet,
                     task_k.deadline + Time::nanos(1.0),
                     |response: &Time|
-                        rta(taskset, k, task_k, *response, model)
+                        rta(taskset, k, task_k, *response, &self.model)
                 );
 
             if response > task_k.deadline {
@@ -50,11 +59,8 @@ pub fn is_schedulable(taskset: &[RTTask], model: &PRModel) -> SchedResult<Vec<Ti
                 return Ok(response);
             }
         })
-        .collect();
-
-    SchedResult {
-        test_name: ALGORITHM.to_owned(),
-        result: result.map_err(|err| SchedError::NonSchedulable(Some(err))),
+        .collect::<Result<_, _>>()
+        .map_err(|err| SchedError::NonSchedulable(Some(err)))
     }
 }
 
@@ -85,16 +91,16 @@ fn equal_to_shin_lee03_rta()
         for resource in time_range_iterator_w_step(period / 10.0, period, Time::nanos(1.0)) {
             let model = PRModel { resource, period };
 
-            let shin_lee_test = super::shin_lee03::is_schedulable(&taskset, &model);
-            let new_test = is_schedulable(&taskset, &model);
+            let shin_lee_test = super::shin_lee03::Analysis { model: model.clone() }.is_schedulable(&taskset);
+            let new_test = Analysis { model: model.clone() }.is_schedulable(&taskset);
 
-            assert_eq!(shin_lee_test.is_schedulable(), new_test.is_schedulable(), "{:?}", model);
+            assert_eq!(shin_lee_test.is_ok(), new_test.is_ok(), "{:?}", model);
 
-            if !shin_lee_test.is_schedulable() {
+            if shin_lee_test.is_err() {
                 continue;
             }
 
-            assert_eq!(shin_lee_test.result.unwrap(), new_test.result.unwrap(), "{:?}", model);
+            assert_eq!(shin_lee_test.unwrap(), new_test.unwrap(), "{:?}", model);
         }
     }
 }

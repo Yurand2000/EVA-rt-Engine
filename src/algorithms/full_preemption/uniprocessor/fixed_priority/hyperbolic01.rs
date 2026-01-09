@@ -9,7 +9,7 @@
 //! - Rate Monotonic priority assigment
 //!
 //! #### Implements:
-//! - [`is_schedulable`] \
+//! - [`Analysis::is_schedulable`] \
 //!   | linear *O(n)* complexity
 //!
 //! ---
@@ -19,28 +19,34 @@
 //!    Systems, June 2001, pp. 59–66. doi: 10.1109/EMRTS.2001.934000.
 
 use crate::prelude::*;
-use eva_rt_common::utils::RTUtils;
 
 const ALGORITHM: &str = "Fixed Priority RM Hyperbolic (Bini, Buttazzo, Buttazzo 2001)";
 
 /// Fixed Priority RM Hyperbolic, Bini, Buttazzo, Buttazzo 2001 \[1\]
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable(taskset: &[RTTask]) -> SchedResult<()> {
-    if !RTUtils::is_taskset_sorted_by_period(taskset) {
-        return SchedResultFactory(ALGORITHM).rate_monotonic();
+pub struct Analysis;
+
+impl SchedAnalysis<(), &[RTTask]> for Analysis {
+    fn analyzer_name(&self) -> &str { ALGORITHM }
+
+    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+        if !RTUtils::constrained_deadlines(taskset) {
+            Err(SchedError::constrained_deadlines())
+        } else if !RTUtils::is_taskset_sorted_by_period(taskset) {
+            Err(SchedError::rate_monotonic())
+        } else {
+            Ok(())
+        }
     }
 
-    if !RTUtils::implicit_deadlines(taskset) {
-        return SchedResultFactory(ALGORITHM).implicit_deadlines();
+    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+        // Theorem 1 [1]
+        let bound: f64 =
+            taskset.iter()
+            .map(|task| task.utilization() + 1.0)
+            .product();
+
+        SchedError::result_from_schedulable(bound <= 2.0)
     }
-
-    // Theorem 1
-    let bound: f64 =
-        taskset.iter()
-        .map(|task| task.utilization() + 1f64)
-        .product();
-
-    SchedResultFactory(ALGORITHM)
-        .is_schedulable(bound <= 2f64)
 }
