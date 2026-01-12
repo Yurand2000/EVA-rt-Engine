@@ -12,9 +12,9 @@
 //!   | O(*n^2*) complexity
 //! - [`DesignerLinear::design`] \
 //!   | O(*n^2*) complexity
-//! - [`extra::generate_model`] \
+//! - [`extra::DesignerPeriodConcurrency::design`] \
 //!   | pseudo-polynomial complexity
-//! - [`extra::generate_best_model`] \
+//! - [`extra::DesignerFull::design`] \
 //!   | pseudo-polynomial complexity
 //!
 //! ---
@@ -113,13 +113,13 @@ pub mod extra {
     /// period and maxmimum cuncurrency.
     ///
     /// Refer to the [module](`self`) level documentation.
-    pub struct DesignerPeriodConcurrencyNaive {
+    pub struct DesignerPeriodConcurrency {
         pub period: Time,
         pub concurrency: u64,
         pub resource_step: Time,
     }
 
-    impl SchedDesign<&[RTTask], MPRModel> for DesignerPeriodConcurrencyNaive<> {
+    impl SchedDesign<&[RTTask], MPRModel> for DesignerPeriodConcurrency<> {
         fn designer_name(&self) -> &str { super::ALGORITHM }
 
         fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
@@ -140,10 +140,10 @@ pub mod extra {
                 designer.run_designer(taskset)?.resource
             };
 
-            (super::super::super::extra::DesignerPeriodConcurrencyNaive {
+            (extra::DesignerPeriodConcurrencyNaive {
                 period: self.period,
                 concurrency: self.concurrency,
-                resource_range: (min_resource, max_resource, self.resource_step),
+                resource_iter_fn: |_, _| Ok(Box::new(time_range_iterator_w_step(min_resource, max_resource, self.resource_step))),
                 analysis_gen_fn: |resource, period, concurrency|
                     super::Analysis { model: MPRModel { resource, period, concurrency }},
                 marker: std::marker::PhantomData,
@@ -158,43 +158,52 @@ pub mod extra {
     /// possible MPRModels given a range of valid periods.
     ///
     /// Refer to the [module](`self`) level documentation.
-    pub fn generate_best_model(
-        taskset: &[RTTask],
-        (min_period, max_period, period_step): (Time, Time, Time),
-        resource_step: Time,
-    ) -> DesignResult<MPRModel> {
-        if !RTUtils::constrained_deadlines(taskset) {
-            return DesignResultFactory(super::ALGORITHM).constrained_deadlines();
-        }
-
-        let min_processors =
-            num_processors_lower_bound(taskset);
-
-        let max_processors =
-            num_processors_upper_bound(taskset);
-
-        let best_model =
-            time_range_iterator_w_step(min_period, max_period, period_step)
-            .flat_map(|period| {
-                (min_processors ..= max_processors)
-                .find_map(|concurrency| {
-                    let best_model =
-                        __generate_model(
-                            taskset,
-                            period,
-                            concurrency,
-                            resource_step
-                        );
-
-                    best_model.result.ok()
-                })
-
-            })
-            .min_by_key(|model| model.resource);
-
-        DesignResultFactory(super::ALGORITHM).from_option(best_model)
+    pub struct DesignerFull {
+        pub period_range: (Time, Time, Time),
+        pub resource_step: Time,
     }
 
+    impl SchedDesign<&[RTTask], MPRModel> for DesignerFull {
+        fn designer_name(&self) -> &str { super::ALGORITHM }
+
+        fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+            if !RTUtils::constrained_deadlines(taskset) {
+                Err(SchedError::constrained_deadlines())
+            } else {
+                Ok(())
+            }
+        }
+
+        fn run_designer(&self, taskset: &[RTTask]) -> Result<MPRModel, SchedError> {
+            let min_processors =
+                num_processors_lower_bound(taskset);
+
+            let max_processors =
+                num_processors_upper_bound(taskset);
+
+            let designer = extra::DesignerNaive {
+                period_iter_fn: || Ok(Box::new(time_range_iterator_w_step(self.period_range.0, self.period_range.1, self.period_range.2))),
+                concurrency_iter_fn: |_| Ok(Box::new(min_processors ..= max_processors)),
+                resource_iter_fn: |period, concurrency| {
+                    let min_resource =
+                        RTUtils::total_utilization(taskset) * period;
+                    let max_resource = {
+                        let designer = super::DesignerLinear { period, concurrency };
+
+                        designer.check_preconditions(&taskset)?;
+                        designer.run_designer(taskset)?.resource
+                    };
+
+                    Ok(Box::new(time_range_iterator_w_step(min_resource, max_resource, self.resource_step)))
+                },
+                analysis_gen_fn: |resource, period, concurrency|
+                    super::Analysis { model: MPRModel { resource, period, concurrency }},
+                marker: std::marker::PhantomData,
+            };
+
+            designer.run_designer(taskset)
+        }
+    }
 
     fn num_processors_lower_bound(taskset: &[RTTask]) -> u64 {
         f64::ceil(RTUtils::total_utilization(taskset)) as u64
