@@ -27,6 +27,7 @@ pub mod earliest_deadline_first {
 
 pub mod fixed_priority {
     pub mod bcl09;
+    pub mod yurand26;
 }
 
 pub mod extra;

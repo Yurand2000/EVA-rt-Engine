@@ -47,6 +47,7 @@ pub mod earliest_deadline_first {
 
 pub mod fixed_priority {
     pub mod shin_lee03;
+    pub mod yurand26;
 }
 
 /// Periodic Resource Model - Shin & Lee 2003 \[1\]
