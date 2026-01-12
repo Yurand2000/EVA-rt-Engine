@@ -8,7 +8,7 @@
 
 EVA implements a variety of *state-of-the-art* tests to assert wheter a given taskset is schedulable on a given platform. Additionally, it also implements designers that search for the minimum required resources to schedule the given task on the given platform and scheduling approach.
 
-EVA is distributed under the GPL3 license, both as a standalone tool and as a Rust library that can be easily integrated in other Rust-based projects.
+EVA is distributed under the **GPL3** license as a Rust library that can be easily integrated in other Rust-based projects.
 
 ## 🚀 Quick Start
 
@@ -16,144 +16,72 @@ EVA is distributed under the GPL3 license, both as a standalone tool and as a Ru
 
 - **Rust**: ≥1.85.1
 
-### Installation (as library)
+### Installation
 
 ```bash
 > cargo add --git https://github.com/Yurand2000/EVA-rt-Engine.git
 ```
 
-### Installation (as tool)
+### Usage
 
-```bash
-# clone the git repository locally and...
-> cargo build (--release)
-```
+Most of the useful information is available in the documentation of the crate, but here is a summary on how the analyzers are organized.
 
-### Basic Usage
+At top level there are two important traits that are implemented by the analyzers: `SchedAnalysis` and `SchedDesign`. All the algorithms implemented in the library are available under the module `algorithms`. The sub-modules specify the target preemption model (for now only `full_preemption`), the platform (`uniprocessor` or `global_multiprocessor`) and the algorithm. The `hierarchical` sub-modules contain different modules which allow hierarchical scheduling of tasksets in different settings.
 
-The analysis software requires an *input file* describing the *taskset* (available formats [here](#taskset-formats)) to analyze and through the command line arguments (or a configuration file, see [advanced usage](#advanced-usage)), it is possible to specify which analysis to run.
+#### Trait: SchedAnalysis
 
-*The following examples make use of the `cargo run` command instead of invoking the executable directly. Cargo will build and run the application with the given parameters. Refer to the documentation of `cargo install` to install the software or run the executable from the `target` folder after building.*
+The first trait, `SchedAnalysis` is implemented by schedulability analyzers, which perform schedulability tests on the given taskset and parameters. As an example, in the module `algorithms::full_preemption::uniprocessor::fixed_priority::rta86` there is the struct `Analysis`, which implements `SchedAnalysis`, and performs the classic response time analysis for fixed priority tasksets on uniprocessor machines:
+```rust
+fn main() {
+  let taskset = [ /* taskset specification */ ];
 
-```bash
-# Let taskset00.txt be a file describing your taskset
-> cat taskset00.txt
-10 20 20
-1 30 30
+  let analyzer = algorithms::full_preemption::uniprocessor::
+                 fixed_priority::rta86::Analysis;
 
-# Run UniProcessor Fixed Priority Test
-> cargo run -- -i taskset00.txt -a up-fp -n 1
-Rate Monotonic - Liu & Layland 1973 (Simplified): Pass
-```
-
-```bash
-# Help screen (prefer --help to -h as you can get more information)
-> cargo run -- --help
-Usage: eva-engine-cli [OPTIONS] -i <TASKSET FILE> <-a <ALGORITHM>|-n <n. CPUs>|--test <TEST NAME>|-c <CONFIG FILE>>
-
-Options:
-  -q          Quiet mode / Exit code as analysis result
-  -h, --help  Print help (see a summary with '-h')
-
-Scheduling Algorithm Specification:
-  -a <ALGORITHM>      Scheduling Algorithm
-                      [possible values:
-                        up-edf,
-                        up-fp,
-                        global-edf,
-                        global-fp]
-  -n <n. CPUs>        Number of processors
-  --test <TEST NAME>  Specific Test
-  -c <CONFIG FILE>    Config file
-
-Taskset Specification:
-  -i <TASKSET FILE>     Taskset data file
-[...]
-```
-
-### Advanced Usage
-
-It is possible to use configuration files to specify which analyses to run, useful for batch modes / scripts and automation. The config file is formatted in *JSON*, and its fields depend on the analysis to run. Refer to the [examples](examples) directory for available fields for each of the given analyses.
-
-```bash
-# Example config for UniProcessor Rate Monotonic
-> cat examples/up_fixed_priority/rate_monotonic/config_hyperbolic.json
-{
-    "algorithm": "UpFP",
-    "num_processors": 1,
-    "specific_test": "rm-hyperbolic"
+  println!("{:?}", analyzer.is_schedulable(&taskset));
 }
-
-# Run the analyzer with the config
-> cargo run -- -i taskset.txt -c config_hyperbolic.json
-Rate Monotonic - Bini, Buttazzo, Buttazzo 2001: Pass
 ```
 
-Another interesting command line option is `-q` for *quiet*, which is still useful for scripts and automatic tasks. Basically, the option suppresses the output to *stdout* and *stderr* (unless a argument error occurs), and the analyzer exits with **0** (zero) when the taskset is deemed schedulable, **1** when it is not schedulable, and any other exit code to signal taskset parsing errors or other analysis specific errors (as an example, unmatched preconditions for certain analyses).
+#### Trait: SchedDesign
 
-```bash
-# Run the software in quiet mode
-> cargo run -- -q -i taskset.txt -c config_hyperbolic.json
+The second trait, `SchedDesign` is instead implemented by schedulability designers, i.e. code which generates the best schedulability parameters for a given algorithm/platform and taskset. As an example, in the module
+`algorithms::full_preemption::uniprocessor::hierarchical::pr_model03` there is the definition of `PRModel` Periodic Resource Model for hierarchical scheduling, along with `fixed_priority::shin_lee03::DesignerLinear` which implements `SchedDesign` and performs an analysis to generate the best Periodic Resource Model that schedules the input taskset:
+```rust
+use algorithms::full_preemption::uniprocessor::
+    hierarchical::pr_model03::*;
 
-# Echo the exit code
-> echo $?
-0
+fn main() {
+  let taskset = [ /* taskset specification */ ];
+
+  // design the best model for the given taskset.
+  let designer = fixed_priority::shin_lee03::DesignerLinear;
+  let model: PRModel = designer.design(&taskset).unwrap();
+
+  println!("{:?}", model);
+
+  // assert that the generated model can really schedule the taskset.
+  let analysis = fixed_priority::shin_lee03::Analysis { model };
+  assert!(analysis.is_schedulable(&taskset));
+}
 ```
 
-For other minor command line options, run the program with `-h` or `--help`.
+#### Examples
 
-### Taskset Formats
+A small set of example code is available in the `examples` directory, which allows to test schedulability of tasksets specified in files, running a bunch of standard schedulability tests.
 
-Currently, the software support two taskset formats:
-- [**Plain-text**](#plain-text)
-- [**JSON**](#json)
+## 🔬 Projects using this Library
 
-#### Plain-Text
-
-Each line in the file represents a task. In case of fixed-priority scheduling, the tasks are assumed to be ordered as given.
-
-Each task is described by three numbers: **Worst Case Execution Time**, **Relative Deadline**, **Relative Period**. All these times are assumed to be in *milliseconds*.
-
-Example Taskset in plain format:
-
-```bash
-> cat taskset.txt
-10 20 50
-30 40 40
-2 120 120
-```
-
-This taskset is comprised of 3 tasks. The highest priority task (if using *fixed-priority scheduling*) has a **WCET** of 10ms, **Deadline** of 20 ms, **Period** of 50ms, and so on...
-
-#### JSON
-
-🚧 Under Construction 🚧
-
-## 🔬 Available Analyses
-
-### Uni-Processor Analyses
-
-*References are available in the individual sub-pages*
-
-- Fixed Priority
-  - [**Rate Monotonic**](src/analyses/up_fixed_priority/rate_monotonic/README.md)
-  - [**Deadline Monotonic**](src/analyses/up_fixed_priority/deadline_monotonic/README.md)
-- [**Earliest Deadline First**](src/analyses/up_earliest_deadline_first/README.md)
-
-### Multi-Processor Analyses
-
-- Global Fixed Priority
-  - [**Deadline Monotonic**](src/analyses/smp_fixed_priority/deadline_monotonic/README.md)
-- [**Global Earliest Deadline First**](src/analyses/smp_earliest_deadline_first/README.md)
+- [HCBS-test-suite](https://github.com/Yurand2000/HCBS-Test-Suite) \
+  The test suite for the [Hierarchical Constant Bandwith Server](https://github.com/Yurand2000/HCBS-patch) patch for the Linux kernel, which generates tests using the hierarchical Multiprocessor Periodic Resource model.
 
 ## 🛠️ Future Work
 
-- [ ] Documentation
+- [X] Documentation
+- [ ] Example GUI interface
 - [ ] [📦 crates.io](crate.io) release
-- [ ] JSOM/YML Support
-- [ ] Partitioned Multi-Processor Designers
-- [ ] Hierarchical Scheduling Designers
-- [ ] *More analyses...*
+- [ ] *More preemption models...*
+- [ ] *More platforms...*
+- [ ] *More analyses and designers...*
 
 ## 📄 License
 
