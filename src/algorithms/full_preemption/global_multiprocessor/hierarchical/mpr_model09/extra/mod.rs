@@ -133,7 +133,7 @@ impl<'a, FnA, A, FnR, FnC, FnP> SchedDesign<&'a [RTTask], MPRModel> for Designer
 
     fn run_designer(&self, taskset: &'a [RTTask]) -> Result<MPRModel, SchedError> {
         (self.period_iter_fn)()?
-        .find_map(|period| {
+        .flat_map(|period| {
             (DesignerPeriodNaive {
                 period,
                 concurrency_iter_fn: self.concurrency_iter_fn.clone(),
@@ -143,6 +143,7 @@ impl<'a, FnA, A, FnR, FnC, FnP> SchedDesign<&'a [RTTask], MPRModel> for Designer
             })
             .run_designer(taskset).ok()
         })
+        .min_by_key(|model| model.resource)
         .ok_or(SchedError::NonSchedulable(None))
     }
 

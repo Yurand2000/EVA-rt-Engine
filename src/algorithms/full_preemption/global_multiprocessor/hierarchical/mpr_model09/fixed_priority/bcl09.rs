@@ -202,6 +202,11 @@ pub mod extra {
             };
 
             designer.run_designer(taskset)
+                .or_else(|_| Ok(MPRModel {
+                    resource: self.period_range.1 * max_processors as f64,
+                    period: self.period_range.1,
+                    concurrency: max_processors
+                }))
         }
     }
 
