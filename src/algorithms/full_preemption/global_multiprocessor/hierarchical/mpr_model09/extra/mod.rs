@@ -143,7 +143,7 @@ impl<'a, FnA, A, FnR, FnC, FnP> SchedDesign<&'a [RTTask], MPRModel> for Designer
             })
             .run_designer(taskset).ok()
         })
-        .min_by_key(|model| model.resource)
+        .min_by(|l, r| l.utilization().total_cmp(&r.utilization()))
         .ok_or(SchedError::NonSchedulable(None))
     }
 

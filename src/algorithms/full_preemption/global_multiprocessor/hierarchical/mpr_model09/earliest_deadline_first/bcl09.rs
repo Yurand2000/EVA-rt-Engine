@@ -69,8 +69,8 @@ impl SchedAnalysis<(), &[RTTask]> for Analysis {
 ///
 /// Refer to the [module](`self`) level documentation.
 pub struct DesignerLinear {
-    period: Time,
-    concurrency: u64,
+    pub period: Time,
+    pub concurrency: u64,
 }
 
 impl SchedDesign<&[RTTask], MPRModel> for DesignerLinear {
@@ -114,9 +114,9 @@ pub mod extra {
     ///
     /// Refer to the [module](`self`) level documentation.
     pub struct DesignerPeriodConcurrency {
-        period: Time,
-        concurrency: u64,
-        resource_step: Time,
+        pub period: Time,
+        pub concurrency: u64,
+        pub resource_step: Time,
     }
 
     impl SchedDesign<&[RTTask], MPRModel> for DesignerPeriodConcurrency<> {
