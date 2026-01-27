@@ -63,7 +63,7 @@ impl SchedAnalysis<(), &[RTTask]> for Analysis {
 ///
 /// Refer to the [module](`self`) level documentation.
 pub struct DesignerLinear {
-    period: Time
+    pub period: Time
 }
 
 impl SchedDesign<&[RTTask], PRModel> for DesignerLinear {
