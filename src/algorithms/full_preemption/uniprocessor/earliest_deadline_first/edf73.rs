@@ -26,19 +26,21 @@ const ALGORITHM: &str = "Earliest Deadline First (Liu & Layland 1973)";
 /// Refer to the [module](`self`) level documentation.
 pub struct Analysis;
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<(), T> for Analysis
+    where T: task_traits::LLTask
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::implicit_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::implicit_deadlines(taskset) {
             Err(SchedError::implicit_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
-        let total_utilization = RTUtils::total_utilization(taskset);
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+        let total_utilization = LLTasksetUtils::total_utilization(taskset);
 
         SchedError::result_from_schedulable(
             total_utilization <= 1f64

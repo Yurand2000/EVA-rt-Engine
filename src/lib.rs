@@ -16,7 +16,9 @@
 pub mod prelude {
     pub use eva_rt_common::prelude::*;
     pub use eva_rt_common::utils::prelude::*;
+    pub use super::task::prelude::*;
     pub use super::utils::{
+        task_utils::prelude::*,
         binary_search::*,
         fixpoint_search::*,
         sched_error::*,
@@ -26,10 +28,13 @@ pub mod prelude {
     };
 }
 
+pub mod task;
 pub mod algorithms;
 
 /// Utility Functions
 pub mod utils {
+    pub mod task_utils;
+
     pub mod binary_search;
     pub mod fixpoint_search;
     pub mod sched_error;

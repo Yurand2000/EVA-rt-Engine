@@ -28,11 +28,13 @@ const ALGORITHM: &str = "RTA (Joseph & Pandya 1986)";
 /// - Worst-Case Response Times of each task.
 pub struct Analysis;
 
-impl SchedAnalysis<Vec<Time>, &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<Vec<Time>, T> for Analysis
+    where T: task_traits::LLTask + task_traits::Priority
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else if !avg_processing_load_is_met(taskset) {
             Err(SchedError::Precondition(Some(
@@ -42,17 +44,17 @@ impl SchedAnalysis<Vec<Time>, &[RTTask]> for Analysis {
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<Vec<Time>, SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<Vec<Time>, SchedError> {
         taskset.iter().enumerate()
             .map(|(i, task)| {
-                let response_time = response_time(&taskset[0..=i]);
+                let response_time = response_time(task, taskset);
 
-                if response_time > task.deadline {
+                if response_time.is_none() {
                     Err(SchedError::NonSchedulable(Some(
                         anyhow::format_err!("task {i} misses its deadline.")
                     )))
                 } else {
-                    Ok(response_time)
+                    Ok(response_time.unwrap())
                 }
             })
             .collect()
@@ -60,36 +62,45 @@ impl SchedAnalysis<Vec<Time>, &[RTTask]> for Analysis {
 }
 
 // Condition 4 [1]
-fn avg_processing_load_is_met(taskset: &[RTTask]) -> bool {
-    let hyperperiod = RTUtils::hyperperiod(taskset);
+fn avg_processing_load_is_met<T>(taskset: &[T]) -> bool
+    where T: task_traits::LLTask + task_traits::Priority
+{
+    let hyperperiod = LLTasksetUtils::hyperperiod(taskset);
 
-    required_resources_over_interval(taskset, hyperperiod) < hyperperiod
+    taskset.iter()
+        .map(|task| required_resources_over_interval(task, hyperperiod))
+        .sum::<Time>()
+    <
+        hyperperiod
 }
 
 // Function 3 + Function 2 [1]
-fn required_resources_over_interval(taskset: &[RTTask], interval: Time) -> Time {
-    taskset.iter()
-        .map(|task| f64::ceil(interval / task.period) * task.wcet)
-        .sum()
+fn required_resources_over_interval<T>(task: &T, interval: Time) -> Time
+    where T: task_traits::LLTask + task_traits::Priority
+{
+    f64::ceil(interval / task.get_period()) * task.get_wcet()
 }
 
 // Equation 6 + Function 5 [1]
-fn response_time(taskset: &[RTTask]) -> Time {
-    if taskset.is_empty() {
-        return Time::zero();
-    }
+fn response_time<T>(task: &T, taskset: &[T]) -> Option<Time>
+    where T: task_traits::LLTask + task_traits::Priority
+{
+    debug_assert!(!taskset.is_empty());
 
-    let task = taskset.last().unwrap();
-    let hp_tasks = &taskset[0..taskset.len() - 1];
+    let response_time =
+        fixpoint_search_with_limit(task.get_wcet(), task.get_deadline() + Time::one(), |response| {
+            taskset.iter()
+                .filter(|other| task.get_priority() > other.get_priority())
+                .map(|hp_task| required_resources_over_interval(hp_task, *response))
+                .sum::<Time>()
+                +
+                task.get_wcet()
+        });
 
-    let mut response = task.wcet;
-    loop {
-        let new_response = required_resources_over_interval(hp_tasks, response) + task.wcet;
-        if new_response == response {
-            return response;
-        }
-
-        response = new_response;
+    if response_time <= task.get_deadline() {
+        Some(response_time)
+    } else {
+        None
     }
 }
 

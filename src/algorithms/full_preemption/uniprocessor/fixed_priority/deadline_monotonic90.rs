@@ -25,23 +25,24 @@ const ALGORITHM: &str = "Fixed Priority DM (Audsley 1990)";
 /// Refer to the [module](`self`) level documentation.
 pub struct Analysis;
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<(), T> for Analysis
+    where T: task_traits::LLTask + task_traits::Priority
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
-        } else if !RTUtils::is_taskset_sorted_by_deadline(taskset) {
+        } else if !LLTasksetUtils::deadline_monotonic_priority_assignment(taskset) {
             Err(SchedError::deadline_monotonic())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
         // Equation 8 [1]
-        #[inline(always)]
-        fn interference(taskset: &[RTTask]) -> Time {
+        let interference = |taskset: &[T]| -> Time {
             if taskset.len() == 0 {
                 return Time::zero();
             }
@@ -50,15 +51,15 @@ impl SchedAnalysis<(), &[RTTask]> for Analysis {
 
             taskset.iter()
                 .take(taskset.len() - 1)
-                .map(|task| (last_task.deadline / task.period).ceil() * task.wcet)
+                .map(|task| (last_task.get_deadline() / task.get_period()).ceil() * task.get_wcet())
                 .sum()
-        }
+        };
 
         // Equation 8 [1]
         let schedulable =
             taskset.iter().enumerate()
             .all(|(i, task)| {
-                task.wcet + interference(&taskset[0..=i]) <= task.deadline
+                task.get_wcet() + interference(&taskset[0..=i]) <= task.get_deadline()
             });
 
         SchedError::result_from_schedulable(schedulable)

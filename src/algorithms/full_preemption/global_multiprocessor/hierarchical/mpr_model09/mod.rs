@@ -54,6 +54,8 @@ impl MPRModel {
 
     /// Get the total supply the model provides in the given time interval.
     pub fn get_supply(&self, interval: Time) -> Time {
+        assert!(interval >= Time::zero());
+
         // Definition 1 [2]
         // Supply Bound Function for a MPRModel
         let m = self.concurrency as f64;
@@ -66,15 +68,15 @@ impl MPRModel {
         if t1 < Time::zero() {
             Time::zero()
         } else {
-            f64::floor(t1 / self.period) * self.resource
+            (f64::floor(t1 / self.period) * self.resource
                 +
             Time::max(Time::zero(), m*x - m*self.period + self.resource)
                 -
-            if x >= Time::one() && x < y {
+            if x >= Time::one() && x <= y {
                 Time::zero()
             } else {
                 Time::nanos(m) - b
-            }
+            }).max(Time::zero())
         }
     }
 
