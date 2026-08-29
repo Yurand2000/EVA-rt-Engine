@@ -66,15 +66,18 @@ impl MPRModel {
         if t1 < Time::zero() {
             Time::zero()
         } else {
-            f64::floor(t1 / self.period) * self.resource
+            Time::max(
+                Time::zero(),
+                f64::floor(t1 / self.period) * self.resource
                 +
-            Time::max(Time::zero(), m*x - m*self.period + self.resource)
+                Time::max(Time::zero(), m*x - m*self.period + self.resource)
                 -
-            if x >= Time::one() && x < y {
-                Time::zero()
-            } else {
-                Time::nanos(m) - b
-            }
+                if x >= Time::one() && x < y {
+                    Time::zero()
+                } else {
+                    Time::nanos(m) - b
+                }
+            )
         }
     }
 
