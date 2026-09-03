@@ -107,23 +107,21 @@ fn response_time<T>(task: &T, taskset: &[T]) -> Option<Time>
 #[test]
 // Example 2 [1]
 fn example_2() {
+    use crate::task::test_utils::*;
+
     let taskset = [
-        RTTask::new_ns(40, 100, 100),
-        RTTask::new_ns(60, 140, 140),
-        RTTask::new_ns(80, 500, 500),
-        RTTask::new_ns(10, 1000, 1000),
-        RTTask::new_ns(1, 1000, 1000),
+        new_prio_task(40, 100, 100, 0),
+        new_prio_task(60, 140, 140, 1),
+        new_prio_task(80, 500, 500, 2),
+        new_prio_task(10, 1000, 1000, 3),
+        new_prio_task(1, 1000, 1000, 4),
     ];
 
-    assert_eq!(response_time(&taskset[0..=0]), Time::nanos(40.0));
-    assert_eq!(response_time(&taskset[0..=1]), Time::nanos(100.0));
-
-    // Response Times (computed with this algorithm) greater than the period are
-    // not the Worst Case Response Times of the given task, as we do not account
-    // for self-interference.
-    assert_eq!(response_time(&taskset[0..=2]), Time::nanos(560.0));
-    assert_eq!(response_time(&taskset[0..=3]), Time::nanos(2490.0));
-    assert_eq!(response_time(&taskset[0..=4]), Time::nanos(6991.0));
+    assert_eq!(response_time(&taskset[0], &taskset), Some(Time::nanos(40.0)));
+    assert_eq!(response_time(&taskset[1], &taskset), Some(Time::nanos(100.0)));
+    assert_eq!(response_time(&taskset[2], &taskset), None);
+    assert_eq!(response_time(&taskset[3], &taskset), None);
+    assert_eq!(response_time(&taskset[4], &taskset), None);
 
     assert!(Analysis.is_schedulable(&taskset).is_err());
 }

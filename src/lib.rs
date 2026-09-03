@@ -14,8 +14,11 @@
 
 /// Prelude module with commonly used exports.
 pub mod prelude {
-    pub use eva_rt_common::prelude::*;
-    pub use eva_rt_common::utils::prelude::*;
+    pub use libtux::prelude::{
+        Time,
+        Time2,
+        TimeIterators,
+    };
     pub use super::task::prelude::*;
     pub use super::utils::{
         task_utils::prelude::*,
@@ -24,7 +27,6 @@ pub mod prelude {
         sched_error::*,
         sched_analysis::*,
         sched_design::*,
-        time_iterators::*,
     };
 }
 
@@ -40,5 +42,4 @@ pub mod utils {
     pub mod sched_error;
     pub mod sched_analysis;
     pub mod sched_design;
-    pub mod time_iterators;
 }

@@ -29,18 +29,20 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<(), T> for Analysis
+    where T: task_traits::LLTask
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
         // Theorem 7 [1]
         // Section 4 Equation 9
         let schedulable =
@@ -48,58 +50,70 @@ impl SchedAnalysis<(), &[RTTask]> for Analysis {
             .all(|(k, task_k)| {
                 global_earliest_deadline_first_demand(taskset, k, task_k)
                     <
-                self.num_processors as f64 * (task_k.laxity() + Time::one())
+                self.num_processors as f64 * (task_k.get_deadline() - task_k.get_wcet() + Time::one())
             });
 
         SchedError::result_from_schedulable(schedulable)
     }
 }
 
-pub fn global_earliest_deadline_first_demand(taskset: &[RTTask], k: usize, task_k: &RTTask) -> Time {
+pub fn global_earliest_deadline_first_demand<T>(taskset: &[T], k: usize, task_k: &T) -> Time
+    where T: task_traits::LLTask
+{
     taskset.iter().enumerate()
         .filter(|(i, _)| *i != k)
         .map(|(_, task_i)| {
             Time::min(
                 interference_edf_upperbound(task_i, task_k),
-                task_k.laxity() + Time::one(),
+                task_k.get_deadline() - task_k.get_wcet() + Time::one(),
             )
         })
         .sum()
 }
 
 // Section 4 Equation 6 [1]
-pub fn workload_upperbound(interval: Time, task: &RTTask) -> Time {
-    jobs_in_interval(interval, task) * task.wcet + carry_out(interval, task)
+pub fn workload_upperbound<T>(interval: Time, task: &T) -> Time
+    where T: task_traits::LLTask
+{
+    jobs_in_interval(interval, task) * task.get_wcet() + carry_out(interval, task)
 }
 
 // Section 4 Equation 5 [1]
 #[inline(always)]
-fn jobs_in_interval(interval: Time, task: &RTTask) -> f64 {
-    ((interval + task.laxity()) / task.period).floor()
+fn jobs_in_interval<T>(interval: Time, task: &T) -> f64
+    where T: task_traits::LLTask
+{
+    ((interval + task.get_deadline() - task.get_wcet()) / task.get_period()).floor()
 }
 
 #[inline(always)]
-fn carry_out(interval: Time, task: &RTTask) -> Time {
-    Time::min(task.wcet, interval + task.laxity() - jobs_in_interval(interval, task) * task.period)
+fn carry_out<T>(interval: Time, task: &T) -> Time
+    where T: task_traits::LLTask
+{
+    Time::min(task.get_wcet(), interval + task.get_deadline() - task.get_wcet() - jobs_in_interval(interval, task) * task.get_period())
 }
 
 // Section 4 Equation 8 [1]
-fn interference_edf_upperbound(by_task: &RTTask, to_task: &RTTask) -> Time {
+fn interference_edf_upperbound<T>(by_task: &T, to_task: &T) -> Time
+    where T: task_traits::LLTask
+{
     let task_i = by_task;
     let task_k = to_task;
 
-    task_k.deadline / task_i.period * task_i.wcet
+    task_k.get_deadline() / task_i.get_period() * task_i.get_wcet()
         +
-    Time::min(task_i.wcet, task_k.deadline - (task_k.deadline / task_i.period) * task_i.period)
+    Time::min(task_i.get_wcet(), task_k.get_deadline() - (task_k.get_deadline() / task_i.get_period()) * task_i.get_period())
 }
 
 #[test]
 // Example 1 [1]
 fn example_1() {
+    use crate::task::test_utils::*;
+
     let taskset = [
-        RTTask::new_ns(20, 30, 30),
-        RTTask::new_ns(20, 30, 30),
-        RTTask::new_ns(5, 30, 30),
+        new_ll_task(20, 30, 30),
+        new_ll_task(20, 30, 30),
+        new_ll_task(5, 30, 30),
     ];
 
     let num_processors = 2;
@@ -111,13 +125,16 @@ fn example_1() {
 #[test]
 // Example 2 [1]
 fn example_2() {
+    use crate::task::test_utils::*;
+    use crate::task::traits::LLTask as _;
+
     let taskset = [
-        RTTask::new_ns(1, 1, 1),
-        RTTask::new_ns(1, 10, 10),
+        new_ll_task(1, 1, 1),
+        new_ll_task(1, 10, 10),
     ];
 
-    assert_eq!(workload_upperbound(taskset[1].deadline, &taskset[0]), Time::nanos(10.0));
-    assert_eq!(workload_upperbound(taskset[0].deadline, &taskset[1]), Time::nanos(1.0));
+    assert_eq!(workload_upperbound(taskset[1].get_deadline(), &taskset[0]), Time::nanos(10.0));
+    assert_eq!(workload_upperbound(taskset[0].get_deadline(), &taskset[1]), Time::nanos(1.0));
     // it should fail, as says in the paper, but it doesn't. Numbers seem ok
     // assert!(!ibcl_generic_work_conserving(&taskset, 2).unwrap());
 }

@@ -33,18 +33,20 @@ pub struct Analysis {
     pub model: PRModel,
 }
 
-impl SchedAnalysis<Vec<Time>, &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<Vec<Time>, T> for Analysis
+    where T: task_traits::LLTask + task_traits::Priority
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<Vec<Time>, SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<Vec<Time>, SchedError> {
         // Equation 14 [1]
         is_schedulable_response(
             taskset,
@@ -63,18 +65,20 @@ pub struct DesignerLinear {
     pub period: Time
 }
 
-impl SchedDesign<&[RTTask], PRModel> for DesignerLinear {
+impl<T> SchedDesign<&[T], PRModel> for DesignerLinear
+    where T: task_traits::LLTask + task_traits::Priority
+{
     fn designer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_designer(&self, taskset: &[RTTask]) -> Result<PRModel, SchedError> {
+    fn run_designer(&self, taskset: &[T]) -> Result<PRModel, SchedError> {
         // Equations 23, 24 [1]
         generate_model_from_response_linear(
             taskset,
@@ -86,11 +90,13 @@ impl SchedDesign<&[RTTask], PRModel> for DesignerLinear {
 }
 
 // Equation 10 [1]
-fn rta(taskset: &[RTTask], k: usize, task_k: &RTTask, response: Time) -> Time {
+fn rta<T>(taskset: &[T], k: usize, task_k: &T, response: Time) -> Time
+    where T: task_traits::LLTask + task_traits::Priority
+{
     taskset.iter()
         .take(k)
-        .map(|task_i| (response / task_i.period).ceil() * task_i.wcet)
+        .map(|task_i| (response / task_i.get_period()).ceil() * task_i.get_wcet())
         .sum::<Time>()
     +
-        task_k.wcet
+        task_k.get_wcet()
 }

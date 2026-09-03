@@ -38,20 +38,22 @@ pub struct AnalysisPeriodic {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for AnalysisPeriodic {
+impl<T> SchedAnalysis<(), T> for AnalysisPeriodic
+    where T: task_traits::LLTask
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::implicit_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::implicit_deadlines(taskset) {
             Err(SchedError::implicit_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
-        let u_tot = RTUtils::total_utilization(taskset);
-        let u_max = RTUtils::largest_utilization(taskset);
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+        let u_tot = LLTasksetUtils::total_utilization(taskset);
+        let u_max = LLTasksetUtils::largest_utilization(taskset);
 
         // Theorem 3 [2]
         let schedulable =
@@ -68,20 +70,22 @@ pub struct AnalysisSporadic {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for AnalysisSporadic {
+impl<T> SchedAnalysis<(), T> for AnalysisSporadic
+    where T: task_traits::LLTask
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
-        let d_tot = RTUtils::total_density(taskset);
-        let d_max = RTUtils::largest_density(taskset);
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+        let d_tot = LLTasksetUtils::total_density(taskset);
+        let d_max = LLTasksetUtils::largest_density(taskset);
 
         // Theorem 4 [2]
         let schedulable =

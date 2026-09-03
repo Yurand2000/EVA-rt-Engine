@@ -19,6 +19,7 @@
 //!    doi: 10.1109/ECRTS.2005.18.
 
 use crate::prelude::*;
+use crate::task::traits::LLTaskUtils as _;
 
 const ALGORITHM: &str = "Multiprocessor EDF (Bertogna, Cirinei, Lipari 2005)";
 
@@ -29,39 +30,45 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<(), T> for Analysis
+    where T: task_traits::LLTask
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
         #[inline(always)]
-        fn num_jobs(task_i: &RTTask, task_k: &RTTask) -> f64 {
-            ((task_k.deadline - task_i.deadline) / (task_i.period)).floor() + 1.0
+        fn num_jobs<T>(task_i: &T, task_k: &T) -> f64
+            where T: task_traits::LLTask
+        {
+            ((task_k.get_deadline() - task_i.get_deadline()) / (task_i.get_period())).floor() + 1.0
         }
 
         #[inline(always)]
         // Theorem 7 [1]
-        fn beta(task_i: &RTTask, task_k: &RTTask) -> f64 {
+        fn beta<T>(task_i: &T, task_k: &T) -> f64
+            where T: task_traits::LLTask
+        {
             let n_jobs = num_jobs(task_i, task_k);
 
             (
-                n_jobs * task_i.wcet
+                n_jobs * task_i.get_wcet()
                     +
                 Time::min(
-                    task_i.wcet,
+                    task_i.get_wcet(),
                     Time::max(
                         Time::zero(),
-                        task_k.deadline - n_jobs * task_i.period
+                        task_k.get_deadline() - n_jobs * task_i.get_period()
                     )
                 )
-            ) / task_k.deadline
+            ) / task_k.get_deadline()
         }
 
         // Theorem 7 [1]

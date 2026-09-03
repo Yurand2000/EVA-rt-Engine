@@ -33,18 +33,20 @@ pub struct Analysis {
     pub model: PRModel,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<(), T> for Analysis
+    where T: task_traits::LLTask
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::implicit_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::implicit_deadlines(taskset) {
             Err(SchedError::implicit_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
         // Equation 9 [1]
         let schedulable =
             is_schedulable_demand(
@@ -66,18 +68,20 @@ pub struct DesignerLinear {
     pub period: Time
 }
 
-impl SchedDesign<&[RTTask], PRModel> for DesignerLinear {
+impl<T> SchedDesign<PRModel, T> for DesignerLinear
+    where T: task_traits::LLTask
+{
     fn designer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::implicit_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::implicit_deadlines(taskset) {
             Err(SchedError::implicit_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_designer(&self, taskset: &[RTTask]) -> Result<PRModel, SchedError> {
+    fn run_designer(&self, taskset: &[T]) -> Result<PRModel, SchedError> {
     // Equation 16 [1]
         generate_model_from_demand_linear(
             taskset,
@@ -90,18 +94,19 @@ impl SchedDesign<&[RTTask], PRModel> for DesignerLinear {
 }
 
 // Section 4.1 [1]
-fn demand(taskset: &[RTTask], interval: Time) -> Time {
+fn demand<T>(taskset: &[T], interval: Time) -> Time
+    where T: task_traits::LLTask
+{
     taskset.iter()
-        .map(|task| (interval / task.period).floor() * task.wcet)
+        .map(|task| (interval / task.get_period()).floor() * task.get_wcet())
         .sum()
 }
 
 // Theorem 1 [1]
-fn time_intervals(taskset: &[RTTask]) -> Box<dyn Iterator<Item = Time>> {
-    let max_time = RTUtils::hyperperiod(taskset) * 2.0;
+fn time_intervals<T>(taskset: &[T]) -> Box<dyn Iterator<Item = Time>>
+    where T: task_traits::LLTask
+{
+    let max_time = LLTasksetUtils::hyperperiod(taskset) * 2.0;
 
-    Box::new(
-        (0 ..= max_time.as_nanos() as u64)
-            .map(|time_ns| Time::nanos(time_ns as f64))
-    )
+    Box::new(TimeIterators::range(Time::zero(), max_time))
 }

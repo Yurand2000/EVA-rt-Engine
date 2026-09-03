@@ -22,6 +22,7 @@
 //!    Tucson, AZ, USA: IEEE, Dec. 2007, pp. 119–128. doi: 10.1109/RTSS.2007.35.
 
 use crate::prelude::*;
+use crate::task::traits::LLTaskUtils as _;
 
 const ALGORITHM: &str = "Multiprocessor EDF (Baruah 2007)";
 
@@ -32,14 +33,16 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<(), T> for Analysis
+    where T: task_traits::LLTask
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
         check_preconditions(taskset)
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
         // As in [1]: It can also be shown that Condition 8 need only be tested at
         // those values of Ak at which DBF(tak_i, Ak
         // + Dk) (and DBF') changes for some task_i.
@@ -57,10 +60,10 @@ impl SchedAnalysis<(), &[RTTask]> for Analysis {
                     .filter(|arrival_k| {
                         // Perform the test only where DBF/DBF' values change.
                         taskset.iter().any(|task_i| {
-                            let interval = *arrival_k + task_k.deadline;
-                            let modulus = interval % task_i.period;
+                            let interval = *arrival_k + task_k.get_deadline();
+                            let modulus = interval % task_i.get_period();
 
-                            modulus <= task_i.wcet || modulus == task_i.deadline
+                            modulus <= task_i.get_wcet() || modulus == task_i.get_deadline()
                         })
                     })
                     .all(|arrival_k| baruah_test_single(taskset, k, task_k, arrival_k, self.num_processors))
@@ -77,14 +80,16 @@ pub struct AnalysisSimple {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for AnalysisSimple {
+impl<T> SchedAnalysis<(), T> for AnalysisSimple
+    where T: task_traits::LLTask
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
         check_preconditions(taskset)
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
 
         let schedulable =
             taskset.iter().enumerate().all(|(k, task_k)| {
@@ -99,8 +104,10 @@ impl SchedAnalysis<(), &[RTTask]> for AnalysisSimple {
     }
 }
 
-fn check_preconditions(taskset: &[RTTask]) -> Result<(), SchedError> {
-    if !RTUtils::constrained_deadlines(taskset) {
+fn check_preconditions<T>(taskset: &[T]) -> Result<(), SchedError>
+    where T: task_traits::LLTask
+{
+    if !LLTasksetUtils::constrained_deadlines(taskset) {
         Err(SchedError::constrained_deadlines())
     } else {
         Ok(())
@@ -108,7 +115,9 @@ fn check_preconditions(taskset: &[RTTask]) -> Result<(), SchedError> {
 }
 
 // Section 5, Theorem 2, Equation 8 [1]
-fn baruah_test_single(taskset: &[RTTask], k: usize, task_k: &RTTask, arrival_k: Time, num_processors: u64) -> bool {
+fn baruah_test_single<T>(taskset: &[T], k: usize, task_k: &T, arrival_k: Time, num_processors: u64) -> bool
+    where T: task_traits::LLTask
+{
 
     let interferences_1: Vec<_> = taskset.iter().enumerate()
         .map(|(i, task_i)| interference_1(i, task_i, k, task_k, arrival_k))
@@ -124,62 +133,74 @@ fn baruah_test_single(taskset: &[RTTask], k: usize, task_k: &RTTask, arrival_k: 
     let idiff_sum = interferences_diff.into_iter()
         .rev().take((num_processors - 1) as usize).sum::<Time>();
 
-    i1_sum + idiff_sum <= num_processors as f64 * (arrival_k + task_k.deadline - task_k.wcet)
+    i1_sum + idiff_sum <= num_processors as f64 * (arrival_k + task_k.get_deadline() - task_k.get_wcet())
 }
 
 // Section 2 [1]
-fn demand_bound_function(task: &RTTask, interval: Time) -> Time {
-    Time::max(Time::zero(), (((interval - task.deadline) / task.period).floor() + 1.0) * task.wcet)
+fn demand_bound_function<T>(task: &T, interval: Time) -> Time
+    where T: task_traits::LLTask
+{
+    Time::max(Time::zero(), (((interval - task.get_deadline()) / task.get_period()).floor() + 1.0) * task.get_wcet())
 }
 
 // Section 6, Equation 3 [1]
-fn interference_1(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, arrival_k: Time) -> Time {
-    let dbf = demand_bound_function(task_i, arrival_k + task_k.deadline);
+fn interference_1<T>(i: usize, task_i: &T, k: usize, task_k: &T, arrival_k: Time) -> Time
+    where T: task_traits::LLTask
+{
+    let dbf = demand_bound_function(task_i, arrival_k + task_k.get_deadline());
     if i != k {
-        Time::min(dbf, arrival_k + task_k.deadline - task_k.wcet)
+        Time::min(dbf, arrival_k + task_k.get_deadline() - task_k.get_wcet())
     } else {
-        Time::min(dbf - task_k.wcet, arrival_k)
+        Time::min(dbf - task_k.get_wcet(), arrival_k)
     }
 }
 
 // Section 6, Equation 4 [1]
-fn demand_bound_function_2(task: &RTTask, interval: Time) -> Time {
-    (interval / task.period).floor() * task.wcet + Time::min(task.wcet, interval % task.period)
+fn demand_bound_function_2<T>(task: &T, interval: Time) -> Time
+    where T: task_traits::LLTask
+{
+    (interval / task.get_period()).floor() * task.get_wcet() + Time::min(task.get_wcet(), interval % task.get_period())
 }
 
 // Section 6, Equation 5 [1]
-fn interference_2(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, arrival_k: Time) -> Time {
-    let dbf2 = demand_bound_function_2(task_i, arrival_k + task_k.deadline);
+fn interference_2<T>(i: usize, task_i: &T, k: usize, task_k: &T, arrival_k: Time) -> Time
+    where T: task_traits::LLTask
+{
+    let dbf2 = demand_bound_function_2(task_i, arrival_k + task_k.get_deadline());
 
     if i != k {
-        Time::min(dbf2, arrival_k + task_k.deadline - task_k.wcet)
+        Time::min(dbf2, arrival_k + task_k.get_deadline() - task_k.get_wcet())
     } else {
-        Time::min(dbf2 - task_k.wcet, arrival_k)
+        Time::min(dbf2 - task_k.get_wcet(), arrival_k)
     }
 }
 
 
 // Section 6, Equation 9 [1]
-fn arrival_k_upperbound(taskset: &[RTTask], task_k: &RTTask, num_processors: u64) -> Time {
-    let mut wcets: Vec<_> = taskset.iter().map(|task| task.wcet).collect();
+fn arrival_k_upperbound<T>(taskset: &[T], task_k: &T, num_processors: u64) -> Time
+    where T: task_traits::LLTask
+{
+    let mut wcets: Vec<_> = taskset.iter().map(|task| task.get_wcet()).collect();
     wcets.sort_unstable();
     let csum: Time = wcets.into_iter().rev().take((num_processors - 1) as usize).sum();
 
-    let total_utilization = RTUtils::total_utilization(taskset);
+    let total_utilization = LLTasksetUtils::total_utilization(taskset);
 
-   (csum - task_k.deadline * (num_processors as f64 - total_utilization)
-        + taskset.iter().map(|task| (task.period - task.deadline) * task.utilization() ).sum()
-        + num_processors as f64 * task_k.wcet)
+   (csum - task_k.get_deadline() * (num_processors as f64 - total_utilization)
+        + taskset.iter().map(|task| (task.get_period() - task.get_deadline()) * task.utilization() ).sum()
+        + num_processors as f64 * task_k.get_wcet())
     /
         (num_processors as f64 - total_utilization)
 }
 
 #[test]
 pub fn simple_vs_optimized() {
+    use crate::task::test_utils::*;
+
     let taskset = [
-        RTTask::new_ns(35, 90, 160),
-        RTTask::new_ns(70, 115, 160),
-        RTTask::new_ns(30, 50, 75),
+        new_ll_task(35, 90, 160),
+        new_ll_task(70, 115, 160),
+        new_ll_task(30, 50, 75),
     ];
 
     let num_processors = 1;
