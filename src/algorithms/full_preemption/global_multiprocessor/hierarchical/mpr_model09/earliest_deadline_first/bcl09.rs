@@ -37,24 +37,26 @@ pub struct Analysis {
     pub model: MPRModel,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<(), T> for Analysis
+    where T: task_traits::LLTask
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
         let schedulable =
             is_schedulable_demand(
                 taskset,
                 &self.model,
-                |taskset, k, task_k, _, _|
-                    demand_edf(taskset, k, task_k, self.model.concurrency),
+                |taskset, _, task_k, _, _|
+                    demand_edf(taskset, task_k, self.model.concurrency),
                 |_, _, _, _| Box::new(std::iter::once(Time::zero())),
             );
 
@@ -73,34 +75,38 @@ pub struct DesignerLinear {
     pub concurrency: u64,
 }
 
-impl SchedDesign<&[RTTask], MPRModel> for DesignerLinear {
+impl<T> SchedDesign<MPRModel, T> for DesignerLinear
+    where T: task_traits::LLTask
+{
     fn designer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_designer(&self, taskset: &[RTTask]) -> Result<MPRModel, SchedError> {
+    fn run_designer(&self, taskset: &[T]) -> Result<MPRModel, SchedError> {
         generate_model_from_demand_linear(
             taskset,
             self.period,
             self.concurrency,
-            |taskset, k, task_k, _, concurrency, _|
-                demand_edf(taskset, k, task_k, concurrency),
+            |taskset, _, task_k, _, concurrency, _|
+                demand_edf(taskset, task_k, concurrency),
             |_, _, _, _, _| Box::new(std::iter::once(Time::zero())),
         )
         .ok_or(SchedError::NonSchedulable(None))
     }
 }
 
-fn demand_edf(taskset: &[RTTask], k: usize, task_k: &RTTask, concurrency: u64) -> Time {
-    global_earliest_deadline_first_demand(taskset, k, task_k)
+fn demand_edf<T>(taskset: &[T], task_k: &T, concurrency: u64) -> Time
+    where T: task_traits::LLTask
+{
+    global_earliest_deadline_first_demand(taskset, task_k)
         +
-    concurrency as f64 * task_k.wcet
+    concurrency as f64 * task_k.get_wcet()
 }
 
 pub mod extra {
@@ -119,20 +125,22 @@ pub mod extra {
         pub resource_step: Time,
     }
 
-    impl SchedDesign<&[RTTask], MPRModel> for DesignerPeriodConcurrency<> {
+    impl<T> SchedDesign<MPRModel, T> for DesignerPeriodConcurrency
+        where T: task_traits::LLTask
+    {
         fn designer_name(&self) -> &str { super::ALGORITHM }
 
-        fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-            if !RTUtils::constrained_deadlines(taskset) {
+        fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+            if !LLTasksetUtils::constrained_deadlines(taskset) {
                 Err(SchedError::constrained_deadlines())
             } else {
                 Ok(())
             }
         }
 
-        fn run_designer(&self, taskset: &[RTTask]) -> Result<MPRModel, SchedError> {
+        fn run_designer(&self, taskset: &[T]) -> Result<MPRModel, SchedError> {
             let min_resource =
-                RTUtils::total_utilization(taskset) * self.period;
+                LLTasksetUtils::total_utilization(taskset) * self.period;
             let max_resource = {
                 let designer = super::DesignerLinear { period: self.period, concurrency: self.concurrency };
 
@@ -143,7 +151,7 @@ pub mod extra {
             (extra::DesignerPeriodConcurrencyNaive {
                 period: self.period,
                 concurrency: self.concurrency,
-                resource_iter_fn: |_, _| Ok(Box::new(time_range_iterator_w_step(min_resource, max_resource, self.resource_step))),
+                resource_iter_fn: |_, _| Ok(Box::new(TimeIterators::range_w_step(min_resource, max_resource, self.resource_step))),
                 analysis_gen_fn: |resource, period, concurrency|
                     super::Analysis { model: MPRModel { resource, period, concurrency }},
                 marker: std::marker::PhantomData,
@@ -163,18 +171,20 @@ pub mod extra {
         pub resource_step: Time,
     }
 
-    impl SchedDesign<&[RTTask], MPRModel> for DesignerFull {
+    impl<T> SchedDesign<MPRModel, T> for DesignerFull
+        where T: task_traits::LLTask
+    {
         fn designer_name(&self) -> &str { super::ALGORITHM }
 
-        fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-            if !RTUtils::constrained_deadlines(taskset) {
+        fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+            if !LLTasksetUtils::constrained_deadlines(taskset) {
                 Err(SchedError::constrained_deadlines())
             } else {
                 Ok(())
             }
         }
 
-        fn run_designer(&self, taskset: &[RTTask]) -> Result<MPRModel, SchedError> {
+        fn run_designer(&self, taskset: &[T]) -> Result<MPRModel, SchedError> {
             let min_processors =
                 num_processors_lower_bound(taskset);
 
@@ -182,11 +192,11 @@ pub mod extra {
                 num_processors_upper_bound(taskset);
 
             let designer = extra::DesignerNaive {
-                period_iter_fn: || Ok(Box::new(time_range_iterator_w_step(self.period_range.0, self.period_range.1, self.period_range.2))),
+                period_iter_fn: || Ok(Box::new(TimeIterators::range_w_step(self.period_range.0, self.period_range.1, self.period_range.2))),
                 concurrency_iter_fn: |_| Ok(Box::new(min_processors ..= max_processors)),
                 resource_iter_fn: |period, concurrency| {
                     let min_resource =
-                        RTUtils::total_utilization(taskset) * period;
+                        LLTasksetUtils::total_utilization(taskset) * period;
                     let max_resource = {
                         let designer = super::DesignerLinear { period, concurrency };
 
@@ -194,7 +204,7 @@ pub mod extra {
                         designer.run_designer(taskset)?.resource
                     };
 
-                    Ok(Box::new(time_range_iterator_w_step(min_resource, max_resource, self.resource_step)))
+                    Ok(Box::new(TimeIterators::range_w_step(min_resource, max_resource, self.resource_step)))
                 },
                 analysis_gen_fn: |resource, period, concurrency|
                     super::Analysis { model: MPRModel { resource, period, concurrency }},
@@ -205,11 +215,15 @@ pub mod extra {
         }
     }
 
-    fn num_processors_lower_bound(taskset: &[RTTask]) -> u64 {
-        f64::ceil(RTUtils::total_utilization(taskset)) as u64
+    fn num_processors_lower_bound<T>(taskset: &[T]) -> u64
+        where T: task_traits::LLTask
+    {
+        f64::ceil(LLTasksetUtils::total_utilization(taskset)) as u64
     }
 
-    fn num_processors_upper_bound(taskset: &[RTTask]) -> u64 {
+    fn num_processors_upper_bound<T>(taskset: &[T]) -> u64
+        where T: task_traits::LLTask
+    {
         taskset.len() as u64
     }
 }

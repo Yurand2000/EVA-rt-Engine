@@ -65,7 +65,7 @@ pub struct DesignerLinear {
     pub period: Time
 }
 
-impl<T> SchedDesign<&[T], PRModel> for DesignerLinear
+impl<T> SchedDesign<PRModel, T> for DesignerLinear
     where T: task_traits::LLTask + task_traits::Priority
 {
     fn designer_name(&self) -> &str { ALGORITHM }

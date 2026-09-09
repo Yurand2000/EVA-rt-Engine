@@ -46,9 +46,9 @@ impl<T> SchedAnalysis<(), T> for Analysis
         // Theorem 7 [1]
         // Section 4 Equation 9
         let schedulable =
-            taskset.iter().enumerate()
-            .all(|(k, task_k)| {
-                global_earliest_deadline_first_demand(taskset, k, task_k)
+            taskset.iter()
+            .all(|task_k| {
+                global_earliest_deadline_first_demand(taskset, task_k)
                     <
                 self.num_processors as f64 * (task_k.get_deadline() - task_k.get_wcet() + Time::one())
             });
@@ -57,12 +57,12 @@ impl<T> SchedAnalysis<(), T> for Analysis
     }
 }
 
-pub fn global_earliest_deadline_first_demand<T>(taskset: &[T], k: usize, task_k: &T) -> Time
+pub fn global_earliest_deadline_first_demand<T>(taskset: &[T], task_k: &T) -> Time
     where T: task_traits::LLTask
 {
-    taskset.iter().enumerate()
-        .filter(|(i, _)| *i != k)
-        .map(|(_, task_i)| {
+    taskset.iter()
+        .filter(|&task_i| !std::ptr::eq(task_i, task_k))
+        .map(|task_i| {
             Time::min(
                 interference_edf_upperbound(task_i, task_k),
                 task_k.get_deadline() - task_k.get_wcet() + Time::one(),

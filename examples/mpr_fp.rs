@@ -1,6 +1,6 @@
 mod utils;
 
-use eva_rt_common::time::Time;
+use libtux::prelude::*;
 use utils::*;
 use eva_rt_engine::{algorithms::full_preemption::global_multiprocessor::
     hierarchical::mpr_model09::fixed_priority::bcl09::*, prelude::SchedDesign as _};
