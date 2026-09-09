@@ -148,7 +148,7 @@ pub fn is_schedulable_response<T, FRTA>(
 ) -> Result<Vec<Time>, anyhow::Error>
     where
         T: task_traits::LLTask,
-        FRTA: FnMut(&[T], usize, &T, Time) -> Time,
+        FRTA: FnMut(&[T], &T, Time) -> Time,
 {
     taskset.iter().enumerate()
         .map(|(k, task_k)| {
@@ -158,7 +158,7 @@ pub fn is_schedulable_response<T, FRTA>(
                     task_k.get_deadline() + Time::nanos(1.0),
                     |response: &Time|
                         model.get_interval_from_supply(
-                            rta_fn(taskset, k, task_k, *response)
+                            rta_fn(taskset, task_k, *response)
                         )
                 );
 
@@ -219,12 +219,12 @@ pub fn generate_model_from_response_linear<T, FRTA>(
 ) -> Option<PRModel>
     where
         T: task_traits::LLTask,
-        FRTA: Fn(&[T], usize, &T, Time) -> Time,
+        FRTA: Fn(&[T], &T, Time) -> Time,
 {
     let min_resource =
-        taskset.iter().enumerate()
-        .map(|(k, task_k)| {
-            let supply = rta_fn(taskset, k, task_k, task_k.get_period());
+        taskset.iter()
+        .map(|task_k| {
+            let supply = rta_fn(taskset, task_k, task_k.get_period());
             PRModel::get_resource_linear(supply, task_k.get_period(), model_period)
         })
         .max()?;

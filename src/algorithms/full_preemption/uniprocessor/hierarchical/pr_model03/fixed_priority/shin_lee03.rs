@@ -90,11 +90,11 @@ impl<T> SchedDesign<&[T], PRModel> for DesignerLinear
 }
 
 // Equation 10 [1]
-fn rta<T>(taskset: &[T], k: usize, task_k: &T, response: Time) -> Time
+fn rta<T>(taskset: &[T], task_k: &T, response: Time) -> Time
     where T: task_traits::LLTask + task_traits::Priority
 {
     taskset.iter()
-        .take(k)
+        .filter(|task_i| task_i.get_priority() > task_k.get_priority())
         .map(|task_i| (response / task_i.get_period()).ceil() * task_i.get_wcet())
         .sum::<Time>()
     +
