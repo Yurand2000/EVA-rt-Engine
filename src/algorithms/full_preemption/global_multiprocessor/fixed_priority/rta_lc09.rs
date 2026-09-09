@@ -28,23 +28,25 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl<T> SchedAnalysis<(), T> for Analysis
+    where T: task_traits::LLTask + task_traits::Priority
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
+        if !LLTasksetUtils::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
         let mut task_rts = vec![Time::zero(); taskset.len()];
 
         for (k, task_k) in taskset.iter().enumerate() {
             let task_k_rt = response_time(taskset, k, self.num_processors, &task_rts[0..k]);
-            if task_k_rt > task_k.deadline {
+            if task_k_rt > task_k.get_deadline() {
                 return Err(SchedError::NonSchedulable(Some(
                     anyhow::format_err!("task {k} misses its deadline.")
                 )));
@@ -58,44 +60,54 @@ impl SchedAnalysis<(), &[RTTask]> for Analysis {
 }
 
 // Equation 5 [1]
-fn workload_non_carry_in(interval: Time, task: &RTTask) -> Time {
-    (interval / task.period).floor() * task.wcet
-        + Time::min(task.wcet, interval % task.period)
+fn workload_non_carry_in<T>(interval: Time, task: &T) -> Time
+    where T: task_traits::LLTask + task_traits::Priority
+{
+    (interval / task.get_period()).floor() * task.get_wcet()
+        + Time::min(task.get_wcet(), interval % task.get_period())
 }
 
 // Equation 6 [1]
-fn workload_carry_in(interval: Time, task: &RTTask, task_rt: Time) -> Time {
-    let work_interval = Time::max(Time::zero(), interval - task.wcet);
+fn workload_carry_in<T>(interval: Time, task: &T, task_rt: Time) -> Time
+    where T: task_traits::LLTask + task_traits::Priority
+{
+    let work_interval = Time::max(Time::zero(), interval - task.get_wcet());
 
-    (work_interval / task.period).floor() * task.wcet
-        + task.wcet
+    (work_interval / task.get_period()).floor() * task.get_wcet()
+        + task.get_wcet()
         + Time::clamp(
-            work_interval % task.period - (task.period - task_rt),
+            work_interval % task.get_period() - (task.get_period() - task_rt),
             Time::zero(),
-            Time::max(task.wcet - Time::one(), Time::zero()),
+            Time::max(task.get_wcet() - Time::one(), Time::zero()),
         )
 }
 
 // Equation 7 [1]
-fn interference_non_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTask) -> Time {
+fn interference_non_carry_in<T>(interval: Time, task_k: &T, task_i: &T) -> Time
+    where T: task_traits::LLTask + task_traits::Priority
+{
     Time::clamp(
         workload_non_carry_in(interval, task_i),
         Time::zero(),
-        Time::max(interval - task_k.wcet + Time::one(), Time::zero())
+        Time::max(interval - task_k.get_wcet() + Time::one(), Time::zero())
     )
 }
 
 // Equation 8 [1]
-fn interference_carry_in(interval: Time, task_k: &RTTask, task_i: &RTTask, task_i_rt: Time) -> Time {
+fn interference_carry_in<T>(interval: Time, task_k: &T, task_i: &T, task_i_rt: Time) -> Time
+    where T: task_traits::LLTask + task_traits::Priority
+{
     Time::clamp(
         workload_carry_in(interval, task_i, task_i_rt),
         Time::zero(),
-        Time::max(interval - task_k.wcet + Time::one(), Time::zero())
+        Time::max(interval - task_k.get_wcet() + Time::one(), Time::zero())
     )
 }
 
 // Equation 9 [1]
-fn total_interference(interval: Time, cpus: u64, taskset: &[RTTask], k: usize, task_rts: &[Time]) -> Time {
+fn total_interference<T>(interval: Time, cpus: u64, taskset: &[T], k: usize, task_rts: &[Time]) -> Time
+    where T: task_traits::LLTask + task_traits::Priority
+{
     assert!(task_rts.len() == k);
 
     let interferences_non_carry_in: Vec<_> =
@@ -122,11 +134,13 @@ fn total_interference(interval: Time, cpus: u64, taskset: &[RTTask], k: usize, t
 }
 
 // Equation 12 [1]
-fn response_time(taskset: &[RTTask], k: usize, cpus: u64, task_rts: &[Time]) -> Time {
-    let mut prev_x = taskset[k].wcet;
+fn response_time<T>(taskset: &[T], k: usize, cpus: u64, task_rts: &[Time]) -> Time
+    where T: task_traits::LLTask + task_traits::Priority
+{
+    let mut prev_x = taskset[k].get_wcet();
     let mut x;
     loop {
-        x = Time::floor(total_interference(prev_x, cpus, taskset, k, task_rts) / cpus as f64) + taskset[k].wcet;
+        x = Time::floor(total_interference(prev_x, cpus, taskset, k, task_rts) / cpus as f64) + taskset[k].get_wcet();
         if x == prev_x {
             return x;
         }
