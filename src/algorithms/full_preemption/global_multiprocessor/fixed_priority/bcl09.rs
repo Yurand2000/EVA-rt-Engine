@@ -46,9 +46,9 @@ impl<T> SchedAnalysis<(), T> for Analysis
         // Theorem 8 [1]
         // Section 4 Equation 10
         let schedulable =
-            taskset.iter().enumerate()
-            .all(|(k, task_k)|
-                global_fixed_priority_demand(taskset, k, task_k)
+            taskset.iter()
+            .all(|task_k|
+                global_fixed_priority_demand(taskset, task_k)
                     <
                 self.num_processors as f64 * (task_k.get_deadline() - task_k.get_wcet() + Time::one())
             );
@@ -57,16 +57,15 @@ impl<T> SchedAnalysis<(), T> for Analysis
     }
 }
 
-pub fn global_fixed_priority_demand<T>(taskset: &[T], k: usize, task_k: &T) -> Time
+pub fn global_fixed_priority_demand<T>(taskset: &[T], task_k: &T) -> Time
     where T: task_traits::LLTask + task_traits::Priority
 {
     use crate::algorithms::full_preemption::global_multiprocessor
              ::earliest_deadline_first::bcl09::workload_upperbound;
 
     taskset.iter()
-        .enumerate()
-        .filter(|(i, _)| *i < k)
-        .map(|(_, task_i)| {
+        .filter(|task_i| task_i.get_priority() > task_k.get_priority())
+        .map(|task_i| {
             Time::min(
                 workload_upperbound(task_k.get_deadline(), task_i),
                 task_k.get_deadline() - task_k.get_wcet() + Time::one(),

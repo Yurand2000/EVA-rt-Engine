@@ -45,7 +45,7 @@ impl<T> SchedAnalysis<(), T> for Analysis
         let mut task_rts = vec![Time::zero(); taskset.len()];
 
         for (k, task_k) in taskset.iter().enumerate() {
-            let task_k_rt = response_time(taskset, k, self.num_processors, &task_rts[0..k]);
+            let task_k_rt = response_time(taskset, task_k, self.num_processors, &task_rts);
             if task_k_rt > task_k.get_deadline() {
                 return Err(SchedError::NonSchedulable(Some(
                     anyhow::format_err!("task {k} misses its deadline.")
@@ -105,21 +105,19 @@ fn interference_carry_in<T>(interval: Time, task_k: &T, task_i: &T, task_i_rt: T
 }
 
 // Equation 9 [1]
-fn total_interference<T>(interval: Time, cpus: u64, taskset: &[T], k: usize, task_rts: &[Time]) -> Time
+fn total_interference<T>(interval: Time, cpus: u64, taskset: &[T], task_k: &T, task_rts: &[Time]) -> Time
     where T: task_traits::LLTask + task_traits::Priority
 {
-    assert!(task_rts.len() == k);
-
     let interferences_non_carry_in: Vec<_> =
-        taskset.iter().enumerate()
-            .filter(|&(i, _)| i < k)
-            .map(|(_, task_i)| interference_non_carry_in(interval, &taskset[k], task_i))
+        taskset.iter()
+            .filter(|task_i| task_i.get_priority() > task_k.get_priority())
+            .map(|task_i| interference_non_carry_in(interval, task_k, task_i))
             .collect();
 
     let interferences_carry_in: Vec<_> =
-        taskset.iter().zip(task_rts).enumerate()
-            .filter(|&(i, _)| i < k)
-            .map(|(_, (task_i, &task_i_rt))| interference_carry_in(interval, &taskset[k], task_i, task_i_rt))
+        taskset.iter().zip(task_rts)
+            .filter(|(task_i, _)| task_i.get_priority() > task_k.get_priority())
+            .map(|(task_i, &task_i_rt)| interference_carry_in(interval, task_k, task_i, task_i_rt))
             .collect();
 
     let mut interference_diffs: Vec<_> =
@@ -134,13 +132,13 @@ fn total_interference<T>(interval: Time, cpus: u64, taskset: &[T], k: usize, tas
 }
 
 // Equation 12 [1]
-fn response_time<T>(taskset: &[T], k: usize, cpus: u64, task_rts: &[Time]) -> Time
+fn response_time<T>(taskset: &[T], task_k: &T, cpus: u64, task_rts: &[Time]) -> Time
     where T: task_traits::LLTask + task_traits::Priority
 {
-    let mut prev_x = taskset[k].get_wcet();
+    let mut prev_x = task_k.get_wcet();
     let mut x;
     loop {
-        x = Time::floor(total_interference(prev_x, cpus, taskset, k, task_rts) / cpus as f64) + taskset[k].get_wcet();
+        x = Time::floor(total_interference(prev_x, cpus, taskset, task_k, task_rts) / cpus as f64) + task_k.get_wcet();
         if x == prev_x {
             return x;
         }
