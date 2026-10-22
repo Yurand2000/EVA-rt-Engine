@@ -54,6 +54,8 @@ impl MPRModel {
 
     /// Get the total supply the model provides in the given time interval.
     pub fn get_supply(&self, interval: Time) -> Time {
+        assert!(interval >= Time::zero());
+
         // Definition 1 [2]
         // Supply Bound Function for a MPRModel
         let m = self.concurrency as f64;
@@ -114,14 +116,14 @@ impl MPRModel {
 // are meant to be pinned to invididual CPUs.
 impl MPRModel {
     // Section 5.2, Definition 1 [1]
-    pub fn to_periodic_tasks(&self) -> Vec<RTTask> {
+    pub fn to_periodic_tasks(&self) -> Vec<LLTask> {
         #[inline(always)]
         fn psi(model: &MPRModel) -> Time {
             model.resource % Time::nanos(model.concurrency as f64)
         }
 
         if self.concurrency == 1 {
-            return vec![ RTTask { wcet: self.resource, deadline: self.period, period: self.period } ];
+            return vec![ LLTask { wcet: self.resource, deadline: self.period, period: self.period } ];
         }
 
         let psi = psi(&self);
@@ -139,7 +141,7 @@ impl MPRModel {
                         (self.resource / self.concurrency as f64).floor()
                     };
 
-                RTTask {
+                LLTask {
                     wcet: wcet,
                     deadline: self.period,
                     period: self.period,
@@ -148,9 +150,9 @@ impl MPRModel {
             .collect()
     }
 
-    pub fn to_periodic_tasks_simple(&self) -> (RTTask, u64) {
+    pub fn to_periodic_tasks_simple(&self) -> (LLTask, u64) {
         let task =
-            RTTask {
+            LLTask {
                 wcet: (self.resource / self.concurrency as f64).floor() + Time::one(),
                 deadline: self.period,
                 period: self.period,
@@ -168,23 +170,26 @@ impl MPRModel {
 /// - A function which provides the set of arrival times of a task to check.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable_demand<'a, 'b, 'c, FDem, FAk>(
-    taskset: &'a [RTTask],
+pub fn is_schedulable_demand<'a, 'b, 'c, T, FDem, FAk>(
+    taskset: &'a [T],
     model: &'b MPRModel,
     mut demand_fn: FDem,
     mut arrival_times_fn: FAk,
 ) -> bool
     where
         'a: 'c, 'b: 'c,
-        FDem: FnMut(&'a [RTTask], usize, &'a RTTask, &'b MPRModel, Time) -> Time,
-        FAk: FnMut(&'a [RTTask], usize, &'a RTTask, &'b MPRModel) -> Box<dyn Iterator<Item = Time> + 'c> ,
+        T: std::borrow::Borrow<LLTask>,
+        FDem: FnMut(&'a [T], usize, &'a T, &'b MPRModel, Time) -> Time,
+        FAk: FnMut(&'a [T], usize, &'a T, &'b MPRModel) -> Box<dyn Iterator<Item = Time> + 'c> ,
 {
     taskset.iter().enumerate()
-    .all(|(k, task_k)| {
-        arrival_times_fn(taskset, k, task_k, model)
+    .all(|(k, __task_k)| {
+        let task_k = __task_k.borrow();
+
+        arrival_times_fn(taskset, k, __task_k, model)
         .all(|arrival_k| {
             let demand =
-                demand_fn(taskset, k, task_k, model, arrival_k);
+                demand_fn(taskset, k, __task_k, model, arrival_k);
 
             let supply =
                 model.get_supply(arrival_k + task_k.deadline);
@@ -210,8 +215,8 @@ pub fn is_schedulable_demand<'a, 'b, 'c, FDem, FAk>(
 /// compute which intervals have the same demand.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn generate_model_from_demand_linear<'a, 'b, FDem, FTime>(
-    taskset: &'a [RTTask],
+pub fn generate_model_from_demand_linear<'a, 'b, T, FDem, FTime>(
+    taskset: &'a [T],
     model_period: Time,
     model_concurrency: u64,
     mut demand_fn: FDem,
@@ -219,20 +224,22 @@ pub fn generate_model_from_demand_linear<'a, 'b, FDem, FTime>(
 ) -> Option<MPRModel>
     where
         'a: 'b,
-        FDem: FnMut(&'a [RTTask], usize, &'a RTTask, Time, u64, Time) -> Time,
-        FTime: FnMut(&'a [RTTask], usize, &'a RTTask, Time, u64) -> Box<dyn Iterator<Item = Time> + 'b>,
+        T: std::borrow::Borrow<LLTask>,
+        FDem: FnMut(&'a [T], usize, &'a T, Time, u64, Time) -> Time,
+        FTime: FnMut(&'a [T], usize, &'a T, Time, u64) -> Box<dyn Iterator<Item = Time> + 'b>,
 {
     let max_feasible_resource = model_period * model_concurrency as f64;
 
     taskset.iter().enumerate()
-    .map(|(k, task_k)| {
+    .map(|(k, __task_k)| {
+        let task_k = __task_k.borrow();
         let time_intervals =
-            time_intervals_fn(taskset, k, task_k, model_period, model_concurrency);
+            time_intervals_fn(taskset, k, __task_k, model_period, model_concurrency);
 
         time_intervals
             .map(|arrival_k| {
                 let interval = arrival_k + task_k.deadline;
-                let demand = demand_fn(taskset, k, task_k, model_period, model_concurrency, arrival_k);
+                let demand = demand_fn(taskset, k, __task_k, model_period, model_concurrency, arrival_k);
 
                 // move this function as static method of
                 let resource = MPRModel::resource_from_supply_linear(
@@ -260,10 +267,10 @@ pub fn generate_model_from_demand_linear<'a, 'b, FDem, FTime>(
 // Tests -----------------------------------------------------------------------
 #[test]
 fn test_lsbf() {
-    for resource in    time_range_iterator_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
-    for period in      time_range_iterator_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
-    for interval in    time_range_iterator_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
-    for concurrency in   1 .. 10 {
+    for resource in    TimeIterators::range_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
+    for period in      TimeIterators::range_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
+    for interval in    TimeIterators::range_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
+    for concurrency in 1 .. 10 {
         // skip unfeasible models
         if resource >= concurrency as f64 * period {
             continue;

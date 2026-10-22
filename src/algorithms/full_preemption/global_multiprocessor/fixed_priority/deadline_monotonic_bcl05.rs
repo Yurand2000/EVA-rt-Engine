@@ -31,23 +31,24 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl SchedAnalysis<(), PriorityTask<LLTask>> for Analysis
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
-        } else if !RTUtils::is_taskset_sorted_by_deadline(taskset) {
+        } else if !Taskset::<PriorityTask<LLTask>>::deadline_monotonic_priority_assignment(taskset) {
             Err(SchedError::deadline_monotonic())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
         // Theorem 5 [1]
-        let d_tot = RTUtils::total_density(taskset);
-        let d_max = RTUtils::largest_density(taskset);
+        let d_tot = Taskset::<LLTask>::total_density(taskset);
+        let d_max = Taskset::<LLTask>::largest_density(taskset);
 
         let schedulable =
             d_tot <= (self.num_processors as f64 / 2f64) * (1f64 - d_max) + d_max;

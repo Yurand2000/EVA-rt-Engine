@@ -25,23 +25,23 @@ const ALGORITHM: &str = "Fixed Priority DM (Audsley 1990)";
 /// Refer to the [module](`self`) level documentation.
 pub struct Analysis;
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl SchedAnalysis<(), PriorityTask<LLTask>> for Analysis
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
-        } else if !RTUtils::is_taskset_sorted_by_deadline(taskset) {
+        } else if !Taskset::<PriorityTask<LLTask>>::deadline_monotonic_priority_assignment(taskset) {
             Err(SchedError::deadline_monotonic())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
         // Equation 8 [1]
-        #[inline(always)]
-        fn interference(taskset: &[RTTask]) -> Time {
+        let interference = |taskset: &[PriorityTask<LLTask>]| -> Time {
             if taskset.len() == 0 {
                 return Time::zero();
             }
@@ -52,7 +52,7 @@ impl SchedAnalysis<(), &[RTTask]> for Analysis {
                 .take(taskset.len() - 1)
                 .map(|task| (last_task.deadline / task.period).ceil() * task.wcet)
                 .sum()
-        }
+        };
 
         // Equation 8 [1]
         let schedulable =

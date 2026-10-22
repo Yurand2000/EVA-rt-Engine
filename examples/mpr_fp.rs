@@ -1,6 +1,6 @@
 mod utils;
 
-use eva_rt_common::time::Time;
+use libtux::prelude::*;
 use utils::*;
 use eva_rt_engine::{algorithms::full_preemption::global_multiprocessor::
     hierarchical::mpr_model09::fixed_priority::bcl09::*, prelude::SchedDesign as _};
@@ -30,7 +30,7 @@ pub struct Args {
 fn main() -> anyhow::Result<()> {
     let args = <Args as clap::Parser>::parse();
 
-    let taskset = parse_taskset(&args.input_file, TasksetPlainUnit::Millis)?;
+    let taskset = parse_taskset_prio(&args.input_file, TasksetPlainUnit::Millis)?;
 
     let designer =
         extra::DesignerFull {

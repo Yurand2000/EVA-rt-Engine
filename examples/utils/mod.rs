@@ -4,9 +4,9 @@ pub mod taskset_serde;
 
 pub use taskset_serde::*;
 
-pub fn run_analysis<A, T, Taskset>(analysis: A, taskset: Taskset) -> anyhow::Result<()>
+pub fn run_analysis<A, T, Task>(analysis: A, taskset: &[Task]) -> anyhow::Result<()>
     where
-        A: SchedAnalysis<T, Taskset>
+        A: SchedAnalysis<T, Task>
 {
     use SchedError as Err;
 

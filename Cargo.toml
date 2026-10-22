@@ -4,9 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-eva-rt-common = "0.1.1"
 anyhow = "1.0.102"
 itertools = "0.14.0"
+libtux = { git = "https://github.com/Yurand2000/libtux", tag = "version-0.1.1", default-features = false, features = [
+	"serde",
+	"time",
+	"time_extra",
+	"time_iterators",
+] }
+num = "0.4.3"
 
 [dev-dependencies]
 clap = { version = "4.6.1", features = ["derive"] }

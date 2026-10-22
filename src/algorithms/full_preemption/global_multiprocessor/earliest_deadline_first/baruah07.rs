@@ -32,14 +32,15 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl SchedAnalysis<(), LLTask> for Analysis
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+    fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
         check_preconditions(taskset)
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
         // As in [1]: It can also be shown that Condition 8 need only be tested at
         // those values of Ak at which DBF(tak_i, Ak
         // + Dk) (and DBF') changes for some task_i.
@@ -77,14 +78,15 @@ pub struct AnalysisSimple {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for AnalysisSimple {
+impl SchedAnalysis<(), LLTask> for AnalysisSimple
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
+    fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
         check_preconditions(taskset)
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
 
         let schedulable =
             taskset.iter().enumerate().all(|(k, task_k)| {
@@ -99,8 +101,9 @@ impl SchedAnalysis<(), &[RTTask]> for AnalysisSimple {
     }
 }
 
-fn check_preconditions(taskset: &[RTTask]) -> Result<(), SchedError> {
-    if !RTUtils::constrained_deadlines(taskset) {
+fn check_preconditions(taskset: &[LLTask]) -> Result<(), SchedError>
+{
+    if !Taskset::<LLTask>::constrained_deadlines(taskset) {
         Err(SchedError::constrained_deadlines())
     } else {
         Ok(())
@@ -108,7 +111,8 @@ fn check_preconditions(taskset: &[RTTask]) -> Result<(), SchedError> {
 }
 
 // Section 5, Theorem 2, Equation 8 [1]
-fn baruah_test_single(taskset: &[RTTask], k: usize, task_k: &RTTask, arrival_k: Time, num_processors: u64) -> bool {
+fn baruah_test_single(taskset: &[LLTask], k: usize, task_k: &LLTask, arrival_k: Time, num_processors: u64) -> bool
+{
 
     let interferences_1: Vec<_> = taskset.iter().enumerate()
         .map(|(i, task_i)| interference_1(i, task_i, k, task_k, arrival_k))
@@ -128,12 +132,14 @@ fn baruah_test_single(taskset: &[RTTask], k: usize, task_k: &RTTask, arrival_k: 
 }
 
 // Section 2 [1]
-fn demand_bound_function(task: &RTTask, interval: Time) -> Time {
+fn demand_bound_function(task: &LLTask, interval: Time) -> Time
+{
     Time::max(Time::zero(), (((interval - task.deadline) / task.period).floor() + 1.0) * task.wcet)
 }
 
 // Section 6, Equation 3 [1]
-fn interference_1(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, arrival_k: Time) -> Time {
+fn interference_1(i: usize, task_i: &LLTask, k: usize, task_k: &LLTask, arrival_k: Time) -> Time
+{
     let dbf = demand_bound_function(task_i, arrival_k + task_k.deadline);
     if i != k {
         Time::min(dbf, arrival_k + task_k.deadline - task_k.wcet)
@@ -143,12 +149,14 @@ fn interference_1(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, arrival_
 }
 
 // Section 6, Equation 4 [1]
-fn demand_bound_function_2(task: &RTTask, interval: Time) -> Time {
+fn demand_bound_function_2(task: &LLTask, interval: Time) -> Time
+{
     (interval / task.period).floor() * task.wcet + Time::min(task.wcet, interval % task.period)
 }
 
 // Section 6, Equation 5 [1]
-fn interference_2(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, arrival_k: Time) -> Time {
+fn interference_2(i: usize, task_i: &LLTask, k: usize, task_k: &LLTask, arrival_k: Time) -> Time
+{
     let dbf2 = demand_bound_function_2(task_i, arrival_k + task_k.deadline);
 
     if i != k {
@@ -160,12 +168,13 @@ fn interference_2(i: usize, task_i: &RTTask, k: usize, task_k: &RTTask, arrival_
 
 
 // Section 6, Equation 9 [1]
-fn arrival_k_upperbound(taskset: &[RTTask], task_k: &RTTask, num_processors: u64) -> Time {
+fn arrival_k_upperbound(taskset: &[LLTask], task_k: &LLTask, num_processors: u64) -> Time
+{
     let mut wcets: Vec<_> = taskset.iter().map(|task| task.wcet).collect();
     wcets.sort_unstable();
     let csum: Time = wcets.into_iter().rev().take((num_processors - 1) as usize).sum();
 
-    let total_utilization = RTUtils::total_utilization(taskset);
+    let total_utilization = Taskset::<LLTask>::total_utilization(taskset);
 
    (csum - task_k.deadline * (num_processors as f64 - total_utilization)
         + taskset.iter().map(|task| (task.period - task.deadline) * task.utilization() ).sum()
@@ -176,10 +185,12 @@ fn arrival_k_upperbound(taskset: &[RTTask], task_k: &RTTask, num_processors: u64
 
 #[test]
 pub fn simple_vs_optimized() {
+    use crate::utils::test_utils::*;
+
     let taskset = [
-        RTTask::new_ns(35, 90, 160),
-        RTTask::new_ns(70, 115, 160),
-        RTTask::new_ns(30, 50, 75),
+        new_ll_task(35, 90, 160),
+        new_ll_task(70, 115, 160),
+        new_ll_task(30, 50, 75),
     ];
 
     let num_processors = 1;

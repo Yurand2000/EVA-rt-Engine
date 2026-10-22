@@ -29,26 +29,29 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl SchedAnalysis<(), LLTask> for Analysis
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
         #[inline(always)]
-        fn num_jobs(task_i: &RTTask, task_k: &RTTask) -> f64 {
+        fn num_jobs(task_i: &LLTask, task_k: &LLTask) -> f64
+        {
             ((task_k.deadline - task_i.deadline) / (task_i.period)).floor() + 1.0
         }
 
         #[inline(always)]
         // Theorem 7 [1]
-        fn beta(task_i: &RTTask, task_k: &RTTask) -> f64 {
+        fn beta(task_i: &LLTask, task_k: &LLTask) -> f64
+        {
             let n_jobs = num_jobs(task_i, task_k);
 
             (

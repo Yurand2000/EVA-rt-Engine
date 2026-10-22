@@ -29,18 +29,19 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl SchedAnalysis<(), LLTask> for Analysis
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
         // Theorem 6 [1]
         // Section 4 Equation 7
         let schedulable =
@@ -48,14 +49,15 @@ impl SchedAnalysis<(), &[RTTask]> for Analysis {
             .all(|(k, task_k)| {
                 work_conserving_demand(taskset, k, task_k)
                     <=
-                self.num_processors as f64 * (task_k.laxity() + Time::one())
+                self.num_processors as f64 * (task_k.deadline - task_k.wcet + Time::one())
             });
 
         SchedError::result_from_schedulable(schedulable)
     }
 }
 
-fn work_conserving_demand(taskset: &[RTTask], k: usize, task_k: &RTTask) -> Time {
+fn work_conserving_demand(taskset: &[LLTask], k: usize, task_k: &LLTask) -> Time
+{
     use crate::algorithms::full_preemption::global_multiprocessor
              ::earliest_deadline_first::bcl09::workload_upperbound;
 
@@ -64,7 +66,7 @@ fn work_conserving_demand(taskset: &[RTTask], k: usize, task_k: &RTTask) -> Time
         .map(|(_, task_i)| {
             Time::min(
                 workload_upperbound(task_k.deadline, task_i),
-                task_k.laxity() + Time::one(),
+                task_k.deadline - task_k.wcet + Time::one(),
             )
         })
         .sum()

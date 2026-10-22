@@ -27,20 +27,21 @@ const ALGORITHM: &str = "Fixed Priority RM Hyperbolic (Bini, Buttazzo, Buttazzo 
 /// Refer to the [module](`self`) level documentation.
 pub struct Analysis;
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl SchedAnalysis<(), PriorityTask<LLTask>> for Analysis
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
-            Err(SchedError::constrained_deadlines())
-        } else if !RTUtils::is_taskset_sorted_by_period(taskset) {
+    fn check_preconditions(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::implicit_deadlines(taskset) {
+            Err(SchedError::implicit_deadlines())
+        } else if !Taskset::<PriorityTask<LLTask>>::rate_monotonic_priority_assignment(taskset) {
             Err(SchedError::rate_monotonic())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
         // Theorem 1 [1]
         let bound: f64 =
             taskset.iter()

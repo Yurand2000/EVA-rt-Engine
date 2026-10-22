@@ -116,15 +116,16 @@ impl PRModel {
 /// Generic implementation for demand based analysis.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable_demand<FDem, FTime>(
-    taskset: &[RTTask],
+pub fn is_schedulable_demand<T, FDem, FTime>(
+    taskset: &[T],
     model: &PRModel,
     mut demand_fn: FDem,
     mut time_intervals_fn: FTime,
 ) -> bool
     where
-        FDem: FnMut(&[RTTask], Time) -> Time,
-        FTime: FnMut(&[RTTask]) -> Box<dyn Iterator<Item = Time>>,
+        T: std::borrow::Borrow<LLTask>,
+        FDem: FnMut(&[T], Time) -> Time,
+        FTime: FnMut(&[T]) -> Box<dyn Iterator<Item = Time>>,
 {
     let mut time_intervals = time_intervals_fn(taskset);
 
@@ -140,23 +141,25 @@ pub fn is_schedulable_demand<FDem, FTime>(
 /// function to guarantee that the computation terminates.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn is_schedulable_response<FRTA>(
-    taskset: &[RTTask],
+pub fn is_schedulable_response<T, FRTA>(
+    taskset: &[T],
     model: &PRModel,
     mut rta_fn: FRTA,
 ) -> Result<Vec<Time>, anyhow::Error>
     where
-        FRTA: FnMut(&[RTTask], usize, &RTTask, Time) -> Time,
+        T: std::borrow::Borrow<LLTask>,
+        FRTA: FnMut(&[T], &T, Time) -> Time,
 {
     taskset.iter().enumerate()
-        .map(|(k, task_k)| {
+        .map(|(k, __task_k)| {
+            let task_k = __task_k.borrow();
             let response =
                 fixpoint_search_with_limit(
                     task_k.wcet,
                     task_k.deadline + Time::nanos(1.0),
                     |response: &Time|
                         model.get_interval_from_supply(
-                            rta_fn(taskset, k, task_k, *response)
+                            rta_fn(taskset, __task_k, *response)
                         )
                 );
 
@@ -173,15 +176,16 @@ pub fn is_schedulable_response<FRTA>(
 /// Generic implementation generating the best [`PRModel`] using demand analysis.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn generate_model_from_demand_linear<FDem, FTime>(
-    taskset: &[RTTask],
+pub fn generate_model_from_demand_linear<T, FDem, FTime>(
+    taskset: &[T],
     model_period: Time,
     demand_fn: FDem,
     time_intervals_fn: FTime,
 ) -> Option<PRModel>
     where
-        FDem: Fn(&[RTTask], Time) -> Time,
-        FTime: Fn(&[RTTask]) -> Box<dyn Iterator<Item = Time>>,
+        T: std::borrow::Borrow<LLTask>,
+        FDem: Fn(&[T], Time) -> Time,
+        FTime: Fn(&[T]) -> Box<dyn Iterator<Item = Time>>,
 {
     let time_intervals = time_intervals_fn(taskset);
 
@@ -209,18 +213,20 @@ pub fn generate_model_from_demand_linear<FDem, FTime>(
 /// Generic implementation generating the best [`PRModel`] using response time analysis.
 ///
 /// Refer to the [module](`self`) level documentation.
-pub fn generate_model_from_response_linear<FRTA>(
-    taskset: &[RTTask],
+pub fn generate_model_from_response_linear<T, FRTA>(
+    taskset: &[T],
     model_period: Time,
     rta_fn: FRTA,
 ) -> Option<PRModel>
     where
-        FRTA: Fn(&[RTTask], usize, &RTTask, Time) -> Time,
+        T: std::borrow::Borrow<LLTask>,
+        FRTA: Fn(&[T], &T, Time) -> Time,
 {
     let min_resource =
-        taskset.iter().enumerate()
-        .map(|(k, task_k)| {
-            let supply = rta_fn(taskset, k, task_k, task_k.period);
+        taskset.iter()
+        .map(|__task_k| {
+            let task_k = __task_k.borrow();
+            let supply = rta_fn(taskset, __task_k, task_k.period);
             PRModel::get_resource_linear(supply, task_k.period, model_period)
         })
         .max()?;

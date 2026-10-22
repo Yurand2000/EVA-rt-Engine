@@ -39,6 +39,7 @@ pub mod full_preemption {
 
         pub mod hierarchical {
             pub mod mpr_model09;
+            pub mod msf_model09;
         }
     }
 }

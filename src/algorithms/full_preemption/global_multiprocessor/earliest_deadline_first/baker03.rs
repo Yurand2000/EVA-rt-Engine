@@ -32,20 +32,22 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl SchedAnalysis<(), &[RTTask]> for Analysis {
+impl SchedAnalysis<(), LLTask> for Analysis
+{
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &&[RTTask]) -> Result<(), SchedError> {
-        if !RTUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[RTTask]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
         // Theorem 5 [2]
-        fn beta(task_i: &RTTask, task_k: &RTTask) -> f64 {
+        fn beta(task_i: &LLTask, task_k: &LLTask) -> f64
+        {
             let b0 = task_i.utilization() * (1.0 + (task_i.period - task_i.deadline) / task_k.deadline);
 
             if task_k.density() >= task_i.utilization() {
@@ -73,10 +75,12 @@ impl SchedAnalysis<(), &[RTTask]> for Analysis {
 #[test]
 // Example in Section 3.3 [2]
 fn gfb_bak_example() {
+    use crate::utils::test_utils::*;
+
     let taskset = [
-        RTTask::new_ns(49, 100, 100),
-        RTTask::new_ns(49, 100, 100),
-        RTTask::new_ns(2, 50, 100),
+        new_ll_task(49, 100, 100),
+        new_ll_task(49, 100, 100),
+        new_ll_task(2, 50, 100),
     ];
 
     let num_processors = 2;
