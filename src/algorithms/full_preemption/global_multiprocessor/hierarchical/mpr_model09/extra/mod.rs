@@ -5,7 +5,7 @@ use anyhow::Context as _;
 
 pub struct DesignerPeriodConcurrencyNaive<T, FnA, A, FnR>
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         A: SchedAnalysis<(), T>,
         FnA: Fn(Time, Time, u64) -> A,
         FnR: Fn(Time, u64) -> Result<Box<dyn Iterator<Item = Time>>, SchedError>,
@@ -19,7 +19,7 @@ pub struct DesignerPeriodConcurrencyNaive<T, FnA, A, FnR>
 
 impl<T, FnA, A, FnR> SchedDesign<MPRModel, T> for DesignerPeriodConcurrencyNaive<T, FnA, A, FnR>
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         A: SchedAnalysis<(), T>,
         FnA: Fn(Time, Time, u64) -> A,
         FnR: Fn(Time, u64) -> Result<Box<dyn Iterator<Item = Time>>, SchedError>,
@@ -54,7 +54,7 @@ impl<T, FnA, A, FnR> SchedDesign<MPRModel, T> for DesignerPeriodConcurrencyNaive
 
 pub struct DesignerPeriodNaive<T, FnA, A, FnR, FnC>
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         A: SchedAnalysis<(), T>,
         FnA: Fn(Time, Time, u64) -> A + Clone,
         FnR: Fn(Time, u64) -> Result<Box<dyn Iterator<Item = Time>>, SchedError> + Clone,
@@ -69,7 +69,7 @@ pub struct DesignerPeriodNaive<T, FnA, A, FnR, FnC>
 
 impl<T, FnA, A, FnR, FnC> SchedDesign<MPRModel, T> for DesignerPeriodNaive<T, FnA, A, FnR, FnC>
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         A: SchedAnalysis<(), T>,
         FnA: Fn(Time, Time, u64) -> A + Clone,
         FnR: Fn(Time, u64) -> Result<Box<dyn Iterator<Item = Time>>, SchedError> + Clone,
@@ -106,7 +106,7 @@ impl<T, FnA, A, FnR, FnC> SchedDesign<MPRModel, T> for DesignerPeriodNaive<T, Fn
 
 pub struct DesignerNaive<T, FnA, A, FnR, FnC, FnP>
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         A: SchedAnalysis<(), T>,
         FnA: Fn(Time, Time, u64) -> A + Clone,
         FnR: Fn(Time, u64) -> Result<Box<dyn Iterator<Item = Time>>, SchedError> + Clone,
@@ -122,7 +122,7 @@ pub struct DesignerNaive<T, FnA, A, FnR, FnC, FnP>
 
 impl<T, FnA, A, FnR, FnC, FnP> SchedDesign<MPRModel, T> for DesignerNaive<T, FnA, A, FnR, FnC, FnP>
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         A: SchedAnalysis<(), T>,
         FnA: Fn(Time, Time, u64) -> A + Clone,
         FnR: Fn(Time, u64) -> Result<Box<dyn Iterator<Item = Time>>, SchedError> + Clone,

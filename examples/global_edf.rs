@@ -14,7 +14,7 @@ pub struct Args {
 fn main() -> anyhow::Result<()> {
     let args = <Args as clap::Parser>::parse();
 
-    let taskset = parse_taskset(&args.input_file, TasksetPlainUnit::Millis)?;
+    let taskset = parse_taskset_ll(&args.input_file, TasksetPlainUnit::Millis)?;
 
     run_analysis(gbf03::AnalysisSporadic { num_processors: args.cpus }, &taskset)?;
     run_analysis(baker03::Analysis { num_processors: args.cpus }, &taskset)?;

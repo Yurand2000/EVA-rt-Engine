@@ -30,24 +30,23 @@ const ALGORITHM: &str = "Fixed Priority RM (Liu & Layland 1973)";
 /// Refer to the [module](`self`) level documentation.
 pub struct Analysis;
 
-impl<T> SchedAnalysis<(), T> for Analysis
-    where T: task_traits::LLTask + task_traits::Priority
+impl SchedAnalysis<(), PriorityTask<LLTask>> for Analysis
 {
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-        if !LLTasksetUtils::implicit_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::implicit_deadlines(taskset) {
             Err(SchedError::implicit_deadlines())
-        } else if !LLTasksetUtils::rate_monotonic_priority_assignment(taskset) {
+        } else if !Taskset::<PriorityTask<LLTask>>::rate_monotonic_priority_assignment(taskset) {
             Err(SchedError::rate_monotonic())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
         // Theorem 5: let m = #Tasks, lub(Utilization) = m * (2^(1/m) - 1) [1]
-        let total_utilization = LLTasksetUtils::total_utilization(taskset);
+        let total_utilization = Taskset::<LLTask>::total_utilization(taskset);
         let rate_monotonic_lub =
             (taskset.len() as f64) * (f64::powf(2.0, 1.0 / taskset.len() as f64) - 1.0);
 
@@ -62,24 +61,23 @@ impl<T> SchedAnalysis<(), T> for Analysis
 /// Use the limit approximation for the least upper bound on the total utilization.
 pub struct AnalysisSimple;
 
-impl<T> SchedAnalysis<(), T> for AnalysisSimple
-    where T: task_traits::LLTask + task_traits::Priority
+impl SchedAnalysis<(), PriorityTask<LLTask>> for AnalysisSimple
 {
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-        if !LLTasksetUtils::implicit_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::implicit_deadlines(taskset) {
             Err(SchedError::implicit_deadlines())
-        } else if !LLTasksetUtils::rate_monotonic_priority_assignment(taskset) {
+        } else if !Taskset::<PriorityTask<LLTask>>::rate_monotonic_priority_assignment(taskset) {
             Err(SchedError::rate_monotonic())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
         // Theorem 5 [1]
-        let total_utilization = LLTasksetUtils::total_utilization(taskset);
+        let total_utilization = Taskset::<LLTask>::total_utilization(taskset);
 
         // Significant limit used for the derivation:
         //   forall a>0. lim x->0 ((a^x - 1) / x) = ln(a)

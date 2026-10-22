@@ -30,7 +30,7 @@ pub struct Args {
 fn main() -> anyhow::Result<()> {
     let args = <Args as clap::Parser>::parse();
 
-    let taskset = parse_taskset(&args.input_file, TasksetPlainUnit::Millis)?;
+    let taskset = parse_taskset_prio(&args.input_file, TasksetPlainUnit::Millis)?;
 
     let designer =
         extra::DesignerFull {

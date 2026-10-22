@@ -9,17 +9,26 @@ pub enum TasksetPlainUnit {
     Nanos
 }
 
-pub fn parse_taskset<P: AsRef<std::path::Path>>(
+pub fn parse_taskset_ll<P: AsRef<std::path::Path>>(
     taskset_file: P,
     unit: TasksetPlainUnit,
-) -> anyhow::Result<Vec<PriorityTask>> {
+) -> anyhow::Result<Vec<LLTask>> {
+    let taskset_data = std::fs::read_to_string(taskset_file)?;
+
+    plain_deserialize_taskset(&taskset_data, unit)
+}
+
+pub fn parse_taskset_prio<P: AsRef<std::path::Path>>(
+    taskset_file: P,
+    unit: TasksetPlainUnit,
+) -> anyhow::Result<Vec<PriorityTask<LLTask>>> {
     let taskset_data = std::fs::read_to_string(taskset_file)?;
 
     plain_deserialize_taskset(&taskset_data, unit)
         .map(|taskset| add_priorities_to_taskset(taskset))
 }
 
-fn add_priorities_to_taskset(taskset: Vec<LLTask>) -> Vec<PriorityTask> {
+fn add_priorities_to_taskset(taskset: Vec<LLTask>) -> Vec<PriorityTask<LLTask>> {
     let max_priority = taskset.len() - 1;
 
     taskset.into_iter().enumerate()

@@ -29,20 +29,19 @@ pub struct Analysis {
     pub num_processors: u64,
 }
 
-impl<T> SchedAnalysis<(), T> for Analysis
-    where T: task_traits::LLTask + task_traits::Priority
+impl SchedAnalysis<(), PriorityTask<LLTask>> for Analysis
 {
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-        if !LLTasksetUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
         // Theorem 8 [1]
         // Section 4 Equation 10
         let schedulable =
@@ -50,25 +49,24 @@ impl<T> SchedAnalysis<(), T> for Analysis
             .all(|task_k|
                 global_fixed_priority_demand(taskset, task_k)
                     <
-                self.num_processors as f64 * (task_k.get_deadline() - task_k.get_wcet() + Time::one())
+                self.num_processors as f64 * (task_k.deadline - task_k.wcet + Time::one())
             );
 
             SchedError::result_from_schedulable(schedulable)
     }
 }
 
-pub fn global_fixed_priority_demand<T>(taskset: &[T], task_k: &T) -> Time
-    where T: task_traits::LLTask + task_traits::Priority
+pub fn global_fixed_priority_demand(taskset: &[PriorityTask<LLTask>], task_k: &PriorityTask<LLTask>) -> Time
 {
     use crate::algorithms::full_preemption::global_multiprocessor
              ::earliest_deadline_first::bcl09::workload_upperbound;
 
     taskset.iter()
-        .filter(|task_i| task_i.get_priority() > task_k.get_priority())
+        .filter(|task_i| task_i.priority > task_k.priority)
         .map(|task_i| {
             Time::min(
-                workload_upperbound(task_k.get_deadline(), task_i),
-                task_k.get_deadline() - task_k.get_wcet() + Time::one(),
+                workload_upperbound(task_k.deadline, task_i),
+                task_k.deadline - task_k.wcet + Time::one(),
             )
         })
         .sum()

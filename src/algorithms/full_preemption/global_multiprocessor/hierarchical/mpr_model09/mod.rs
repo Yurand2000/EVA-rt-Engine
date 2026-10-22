@@ -175,19 +175,21 @@ pub fn is_schedulable_demand<'a, 'b, 'c, T, FDem, FAk>(
 ) -> bool
     where
         'a: 'c, 'b: 'c,
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         FDem: FnMut(&'a [T], usize, &'a T, &'b MPRModel, Time) -> Time,
         FAk: FnMut(&'a [T], usize, &'a T, &'b MPRModel) -> Box<dyn Iterator<Item = Time> + 'c> ,
 {
     taskset.iter().enumerate()
-    .all(|(k, task_k)| {
-        arrival_times_fn(taskset, k, task_k, model)
+    .all(|(k, __task_k)| {
+        let task_k = __task_k.borrow();
+
+        arrival_times_fn(taskset, k, __task_k, model)
         .all(|arrival_k| {
             let demand =
-                demand_fn(taskset, k, task_k, model, arrival_k);
+                demand_fn(taskset, k, __task_k, model, arrival_k);
 
             let supply =
-                model.get_supply(arrival_k + task_k.get_deadline());
+                model.get_supply(arrival_k + task_k.deadline);
 
             demand <= supply
         })
@@ -219,21 +221,22 @@ pub fn generate_model_from_demand_linear<'a, 'b, T, FDem, FTime>(
 ) -> Option<MPRModel>
     where
         'a: 'b,
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         FDem: FnMut(&'a [T], usize, &'a T, Time, u64, Time) -> Time,
         FTime: FnMut(&'a [T], usize, &'a T, Time, u64) -> Box<dyn Iterator<Item = Time> + 'b>,
 {
     let max_feasible_resource = model_period * model_concurrency as f64;
 
     taskset.iter().enumerate()
-    .map(|(k, task_k)| {
+    .map(|(k, __task_k)| {
+        let task_k = __task_k.borrow();
         let time_intervals =
-            time_intervals_fn(taskset, k, task_k, model_period, model_concurrency);
+            time_intervals_fn(taskset, k, __task_k, model_period, model_concurrency);
 
         time_intervals
             .map(|arrival_k| {
-                let interval = arrival_k + task_k.get_deadline();
-                let demand = demand_fn(taskset, k, task_k, model_period, model_concurrency, arrival_k);
+                let interval = arrival_k + task_k.deadline;
+                let demand = demand_fn(taskset, k, __task_k, model_period, model_concurrency, arrival_k);
 
                 // move this function as static method of
                 let resource = MPRModel::resource_from_supply_linear(
@@ -261,8 +264,6 @@ pub fn generate_model_from_demand_linear<'a, 'b, T, FDem, FTime>(
 // Tests -----------------------------------------------------------------------
 #[test]
 fn test_lsbf() {
-    use libtux::prelude::TimeIterators;
-
     for resource in    TimeIterators::range_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
     for period in      TimeIterators::range_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {
     for interval in    TimeIterators::range_w_step(Time::millis(10.0), Time::millis(1000.0), Time::millis(10.0)) {

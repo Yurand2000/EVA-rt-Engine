@@ -3,6 +3,7 @@ use crate::prelude::*;
 pub mod prelude {
     pub use super::{
         PriorityTask,
+        Taskset,
         LLTask,
     };
 }
@@ -22,6 +23,18 @@ impl<Task> std::ops::Deref for PriorityTask<Task> {
 
 impl<Task> std::ops::DerefMut for PriorityTask<Task> {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.task
+    }
+}
+
+impl<Task> std::borrow::Borrow<Task> for PriorityTask<Task> {
+    fn borrow(&self) -> &Task {
+        &self.task
+    }
+}
+
+impl<Task> std::borrow::BorrowMut<Task> for PriorityTask<Task> {
+    fn borrow_mut(&mut self) -> &mut Task {
         &mut self.task
     }
 }
@@ -53,55 +66,55 @@ impl LLTask {
 pub struct Taskset<T>(std::marker::PhantomData<T>);
 
 impl Taskset<LLTask> {
-    pub fn implicit_deadlines<'a, Taskset, Task>(mut taskset: Taskset) -> bool
-        where Taskset: Iterator<Item = &'a Task>,
-              Task: std::ops::Deref<Target = LLTask> + 'static
+    pub fn implicit_deadlines<'a, Taskset, Task>(taskset: Taskset) -> bool
+        where Taskset: IntoIterator<Item = &'a Task>,
+              Task: std::borrow::Borrow<LLTask> + 'static,
     {
-        taskset.all(|t| LLTask::has_implicit_deadline(t.deref()))
+        taskset.into_iter().all(|t| LLTask::has_implicit_deadline(t.borrow()))
     }
 
-    pub fn constrained_deadlines<'a, Taskset, Task>(mut taskset: Taskset) -> bool
-        where Taskset: Iterator<Item = &'a Task>,
-              Task: std::ops::Deref<Target = LLTask> + 'static
+    pub fn constrained_deadlines<'a, Taskset, Task>(taskset: Taskset) -> bool
+        where Taskset: IntoIterator<Item = &'a Task>,
+              Task: std::borrow::Borrow<LLTask> + 'static,
     {
-        taskset.all(|t| LLTask::has_constrained_deadline(t.deref()))
+        taskset.into_iter().all(|t| LLTask::has_constrained_deadline(t.borrow()))
     }
 
     pub fn total_utilization<'a, Taskset, Task>(taskset: Taskset) -> f64
-        where Taskset: Iterator<Item = &'a Task>,
-              Task: std::ops::Deref<Target = LLTask> + 'static
+        where Taskset: IntoIterator<Item = &'a Task>,
+              Task: std::borrow::Borrow<LLTask> + 'static,
     {
-        taskset.map(|t| LLTask::utilization(t.deref())).sum()
+        taskset.into_iter().map(|t| LLTask::utilization(t.borrow())).sum()
     }
 
     pub fn total_density<'a, Taskset, Task>(taskset: Taskset) -> f64
-        where Taskset: Iterator<Item = &'a Task>,
-              Task: std::ops::Deref<Target = LLTask> + 'static
+        where Taskset: IntoIterator<Item = &'a Task>,
+              Task: std::borrow::Borrow<LLTask> + 'static,
     {
-        taskset.map(|t| LLTask::density(t.deref())).sum()
+        taskset.into_iter().map(|t| LLTask::density(t.borrow())).sum()
     }
 
     pub fn largest_utilization<'a, Taskset, Task>(taskset: Taskset) -> f64
-        where Taskset: Iterator<Item = &'a Task>,
-              Task: std::ops::Deref<Target = LLTask> + 'static
+        where Taskset: IntoIterator<Item = &'a Task>,
+              Task: std::borrow::Borrow<LLTask> + 'static,
     {
-        taskset.map(|t| LLTask::utilization(t.deref())).max_by(f64::total_cmp).unwrap_or(0.0)
+        taskset.into_iter().map(|t| LLTask::utilization(t.borrow())).max_by(f64::total_cmp).unwrap_or(0.0)
     }
 
     pub fn largest_density<'a, Taskset, Task>(taskset: Taskset) -> f64
-        where Taskset: Iterator<Item = &'a Task>,
-              Task: std::ops::Deref<Target = LLTask> + 'static
+        where Taskset: IntoIterator<Item = &'a Task>,
+              Task: std::borrow::Borrow<LLTask> + 'static,
     {
-        taskset.map(|t| LLTask::density(t.deref())).max_by(f64::total_cmp).unwrap_or(0.0)
+        taskset.into_iter().map(|t| LLTask::density(t.borrow())).max_by(f64::total_cmp).unwrap_or(0.0)
     }
 
     pub fn hyperperiod<'a, Taskset, Task>(taskset: Taskset) -> Time
-        where Taskset: Iterator<Item = &'a Task>,
-              Task: std::ops::Deref<Target = LLTask> + 'static
+        where Taskset: IntoIterator<Item = &'a Task>,
+              Task: std::borrow::Borrow<LLTask> + 'static,
     {
         let hyperperiod =
-            taskset
-            .map(|t| t.period.as_nanos() as i64)
+            taskset.into_iter()
+            .map(|t| t.borrow().period.as_nanos() as i64)
             .fold(1, |lcm, period| num::integer::lcm(lcm, period));
 
         Time::nanos(hyperperiod as f64)
@@ -109,9 +122,11 @@ impl Taskset<LLTask> {
 }
 
 impl Taskset<PriorityTask<LLTask>> {
-    pub fn rate_monotonic_priority_assignment<'a, Taskset>(mut taskset: Taskset) -> bool
-        where Taskset: Iterator<Item = &'a PriorityTask<LLTask>> + Clone,
+    pub fn rate_monotonic_priority_assignment<'a, Taskset, Iter>(taskset: Taskset) -> bool
+        where Taskset: IntoIterator<Item = &'a PriorityTask<LLTask>, IntoIter = Iter>,
+              Iter: Iterator<Item = &'a PriorityTask<LLTask>> + Clone,
     {
+        let mut taskset = taskset.into_iter();
         while let Some(task_i) = taskset.next() {
             if taskset.clone().any(|task_j|
                 (task_i.priority == task_j.priority) ||
@@ -125,9 +140,11 @@ impl Taskset<PriorityTask<LLTask>> {
         return true;
     }
 
-    pub fn deadline_monotonic_priority_assignment<'a, Taskset>(mut taskset: Taskset) -> bool
-        where Taskset: Iterator<Item = &'a PriorityTask<LLTask>> + Clone,
+    pub fn deadline_monotonic_priority_assignment<'a, Taskset, Iter>(taskset: Taskset) -> bool
+        where Taskset: IntoIterator<Item = &'a PriorityTask<LLTask>, IntoIter = Iter>,
+              Iter: Iterator<Item = &'a PriorityTask<LLTask>> + Clone,
     {
+        let mut taskset = taskset.into_iter();
         while let Some(task_i) = taskset.next() {
             if taskset.clone().any(|task_j|
                 (task_i.priority == task_j.priority) ||

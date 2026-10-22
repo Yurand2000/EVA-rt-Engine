@@ -28,7 +28,6 @@
 
 use crate::prelude::*;
 use crate::algorithms::full_preemption::global_multiprocessor::hierarchical::mpr_model09::*;
-use task_traits::LLTaskUtils as _;
 
 const ALGORITHM: &str = "MPR Model, EDF Local Scheduler (Shin, Easwaran, Lee 2009)";
 
@@ -39,15 +38,14 @@ pub struct Analysis {
     pub model: MPRModel,
 }
 
-impl<T> SchedAnalysis<(), T> for Analysis
-    where T: task_traits::LLTask
+impl SchedAnalysis<(), LLTask> for Analysis
 {
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-        if !LLTasksetUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
-        } else if f64::abs(self.model.utilization() - LLTasksetUtils::total_utilization(taskset)) < 0.01 {
+        } else if f64::abs(self.model.utilization() - Taskset::<LLTask>::total_utilization(taskset)) < 0.01 {
             Err(SchedError::Other(
                 anyhow::format_err!("Arrival times upperbound tends to infinity, the computation becomes intractable.")
             ))
@@ -56,7 +54,7 @@ impl<T> SchedAnalysis<(), T> for Analysis
         }
     }
 
-    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
         // Section 4.2, Theorem 1 [1]
         let schedulable =
             is_schedulable_demand(
@@ -87,20 +85,19 @@ pub struct AnalysisSimple {
     pub model: MPRModel,
 }
 
-impl<T> SchedAnalysis<(), T> for AnalysisSimple
-    where T: task_traits::LLTask
+impl SchedAnalysis<(), LLTask> for AnalysisSimple
 {
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-        if !LLTasksetUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
         // Section 4.2, Theorem 1 [1]
         let schedulable =
             is_schedulable_demand(
@@ -131,20 +128,19 @@ pub struct DesignerLinear {
     pub concurrency: u64,
 }
 
-impl<T> SchedDesign<MPRModel, T> for DesignerLinear
-    where T: task_traits::LLTask
+impl SchedDesign<MPRModel, LLTask> for DesignerLinear
 {
     fn designer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-        if !LLTasksetUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_designer(&self, taskset: &[T]) -> Result<MPRModel, SchedError> {
+    fn run_designer(&self, taskset: &[LLTask]) -> Result<MPRModel, SchedError> {
         generate_model_from_demand_linear(
             taskset,
             self.period,
@@ -174,13 +170,13 @@ impl<T> SchedDesign<MPRModel, T> for DesignerLinear
                         // and I_flat change, as it is a monotone function (i.e., if
                         // it's satisfied between those intervals, it will be also
                         // satisfied outside because of monotonicity).
-                        let interval = *arrival_k + task_k.get_deadline();
+                        let interval = *arrival_k + task_k.deadline;
 
                         // Perform the test only where I_hat/I_flat values change.
                         taskset.iter().any(|task_i| {
-                            let modulus = *arrival_k % task_i.get_period();
+                            let modulus = *arrival_k % task_i.period;
 
-                            interval <= task_i.get_wcet() || modulus == Time::zero()
+                            interval <= task_i.wcet || modulus == Time::zero()
                         })
                     })
                 )
@@ -190,14 +186,12 @@ impl<T> SchedDesign<MPRModel, T> for DesignerLinear
     }
 }
 
-fn filter_intervals_edf<T>(
-    taskset: &[T],
-    task_k: &T,
+fn filter_intervals_edf(
+    taskset: &[LLTask],
+    task_k: &LLTask,
     model: &MPRModel,
     arrival_k: Time
-) -> bool
-    where T: task_traits::LLTask
-{
+) -> bool {
     // It is also easy to show that Equation (5) only needs to be evaluated at
     // those values of Ak for which at least one  of I_hat, I_flat, or sbf
     // change. [1]
@@ -209,7 +203,7 @@ fn filter_intervals_edf<T>(
     // changes at every interval, the non-linear sbf is constant for values in
     // the range [-floor(Theta/m) + a*Pi, Pi - 2floor(Theta/m) + a*Pi] for all a
     // >= 0.
-    let interval = arrival_k + task_k.get_deadline();
+    let interval = arrival_k + task_k.deadline;
 
     // Perform the test only where SBF changes
     let floor = (model.resource / model.concurrency as f64).floor();
@@ -220,33 +214,32 @@ fn filter_intervals_edf<T>(
 
     // Perform the test only where I_hat/I_flat values change.
     taskset.iter().any(|task_i| {
-        let modulus = arrival_k % task_i.get_period();
+        let modulus = arrival_k % task_i.period;
 
-        interval <= task_i.get_wcet() || modulus == Time::zero()
+        interval <= task_i.wcet || modulus == Time::zero()
     })
 }
 
 // Section 4.2, Theorem 2 [1]
-fn arrival_k_upperbound_edf<T>(taskset: &[T], task_k: &T, model: &MPRModel) -> Time
-    where T: task_traits::LLTask
+fn arrival_k_upperbound_edf(taskset: &[LLTask], task_k: &LLTask, model: &MPRModel) -> Time
 {
-    let taskset_utilization = LLTasksetUtils::total_utilization(taskset);
+    let taskset_utilization = Taskset::<LLTask>::total_utilization(taskset);
 
     let mut wcets: Vec<_> =
-        taskset.iter().map(|task| task.get_wcet()).collect();
+        taskset.iter().map(|task| task.wcet).collect();
     wcets.sort_unstable();
 
     let c_sum: Time = wcets.into_iter().rev().take(model.concurrency as usize - 1).sum();
 
     let u_sum: Time = taskset.iter()
-        .map(|task| (task.get_period() - task.get_deadline()) * task.utilization()).sum();
+        .map(|task| (task.period - task.deadline) * task.utilization()).sum();
     let b_sum: Time =
         model.resource * (2.0 - (2.0 * model.resource) / (model.concurrency as f64 * model.period));
 
     (
         c_sum
-        - model.concurrency as f64 * task_k.get_wcet()
-        - task_k.get_deadline() * (model.utilization() - taskset_utilization)
+        - model.concurrency as f64 * task_k.wcet
+        - task_k.deadline * (model.utilization() - taskset_utilization)
         + u_sum + b_sum
     ) / (
         model.utilization() - taskset_utilization
@@ -254,8 +247,7 @@ fn arrival_k_upperbound_edf<T>(taskset: &[T], task_k: &T, model: &MPRModel) -> T
 }
 
 // Section 4.2, Theorem 1 [1]
-fn demand_edf<T>(taskset: &[T], task_k: &T, concurrency: u64, arrival_k: Time) -> Time
-    where T: task_traits::LLTask
+fn demand_edf(taskset: &[LLTask], task_k: &LLTask, concurrency: u64, arrival_k: Time) -> Time
 {
     let interference_hat: Vec<_> =
         taskset.iter()
@@ -273,66 +265,60 @@ fn demand_edf<T>(taskset: &[T], task_k: &T, concurrency: u64, arrival_k: Time) -
     let sum_interference_diff: Time = interference_diff.into_iter().rev()
         .take(concurrency as usize - 1).sum();
 
-    sum_interference_hat + sum_interference_diff + concurrency as f64 * task_k.get_wcet()
+    sum_interference_hat + sum_interference_diff + concurrency as f64 * task_k.wcet
 }
 
 // Section 4.2, Theorem 1 [1]
-fn interference_flat<T>(task_i: &T, task_k: &T, arrival_k: Time) -> Time
-    where T: task_traits::LLTask
+fn interference_flat(task_i: &LLTask, task_k: &LLTask, arrival_k: Time) -> Time
 {
-    let workload_upperbound = workload_upperbound_2_edf(task_i, arrival_k + task_k.get_deadline());
+    let workload_upperbound = workload_upperbound_2_edf(task_i, arrival_k + task_k.deadline);
 
     if std::ptr::eq(task_i, task_k) {
-        Time::min(workload_upperbound - task_k.get_wcet(), arrival_k)
+        Time::min(workload_upperbound - task_k.wcet, arrival_k)
     } else {
-        Time::min(workload_upperbound, arrival_k + task_k.get_deadline() - task_k.get_wcet())
+        Time::min(workload_upperbound, arrival_k + task_k.deadline - task_k.wcet)
     }
 }
 
 // Section 4.2, Theorem 1 [1]
-fn interference_hat<T>(task_i: &T, task_k: &T, arrival_k: Time) -> Time
-    where T: task_traits::LLTask
+fn interference_hat(task_i: &LLTask, task_k: &LLTask, arrival_k: Time) -> Time
 {
-    let workload_upperbound = workload_upperbound_edf(task_i, arrival_k + task_k.get_deadline());
+    let workload_upperbound = workload_upperbound_edf(task_i, arrival_k + task_k.deadline);
 
     if std::ptr::eq(task_i, task_k) {
-        Time::min(workload_upperbound - task_k.get_wcet(), arrival_k)
+        Time::min(workload_upperbound - task_k.wcet, arrival_k)
     } else {
-        Time::min(workload_upperbound, arrival_k + task_k.get_deadline() - task_k.get_wcet())
+        Time::min(workload_upperbound, arrival_k + task_k.deadline - task_k.wcet)
     }
 }
 
 // Equation 3 [1]
-fn workload_upperbound_2_edf<T>(task: &T, time: Time) -> Time
-    where T: task_traits::LLTask
+fn workload_upperbound_2_edf(task: &LLTask, time: Time) -> Time
 {
-    activations_in_interval_edf(task, time) * task.get_wcet() + carry_in_edf(task, time)
+    activations_in_interval_edf(task, time) * task.wcet + carry_in_edf(task, time)
 }
 
-fn workload_upperbound_edf<T>(task: &T, time: Time) -> Time
-    where T: task_traits::LLTask
+fn workload_upperbound_edf(task: &LLTask, time: Time) -> Time
 {
-    activations_in_interval_edf(task, time) * task.get_wcet()
-}
-
-// Equation 3 [1]
-#[inline(always)]
-fn activations_in_interval_edf<T>(task: &T, time: Time) -> f64
-    where T: task_traits::LLTask
-{
-    ((time + task.get_period() - task.get_deadline()) / task.get_period()).floor()
+    activations_in_interval_edf(task, time) * task.wcet
 }
 
 // Equation 3 [1]
 #[inline(always)]
-fn carry_in_edf<T>(task: &T, time: Time) -> Time
-    where T: task_traits::LLTask
+fn activations_in_interval_edf(task: &LLTask, time: Time) -> f64
+{
+    ((time + task.period - task.deadline) / task.period).floor()
+}
+
+// Equation 3 [1]
+#[inline(always)]
+fn carry_in_edf(task: &LLTask, time: Time) -> Time
 {
     Time::min(
-        task.get_wcet(),
+        task.wcet,
         Time::max(
             Time::zero(),
-            time - activations_in_interval_edf(task, time) * task.get_period()
+            time - activations_in_interval_edf(task, time) * task.period
         )
     )
 }
@@ -353,22 +339,21 @@ pub mod extra {
         pub resource_step: Time,
     }
 
-    impl<T> SchedDesign<MPRModel, T> for DesignerPeriodConcurrency
-        where T: task_traits::LLTask
+    impl SchedDesign<MPRModel, LLTask> for DesignerPeriodConcurrency
     {
         fn designer_name(&self) -> &str { super::ALGORITHM }
 
-        fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-            if !LLTasksetUtils::constrained_deadlines(taskset) {
+        fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
+            if !Taskset::<LLTask>::constrained_deadlines(taskset) {
                 Err(SchedError::constrained_deadlines())
             } else {
                 Ok(())
             }
         }
 
-        fn run_designer(&self, taskset: &[T]) -> Result<MPRModel, SchedError> {
+        fn run_designer(&self, taskset: &[LLTask]) -> Result<MPRModel, SchedError> {
             let min_resource =
-                LLTasksetUtils::total_utilization(taskset) * self.period;
+                Taskset::<LLTask>::total_utilization(taskset) * self.period;
             let max_resource = {
                 let designer = super::DesignerLinear { period: self.period, concurrency: self.concurrency };
 
@@ -399,20 +384,19 @@ pub mod extra {
         pub resource_step: Time,
     }
 
-    impl<T> SchedDesign<MPRModel, T> for DesignerFull
-        where T: task_traits::LLTask
+    impl SchedDesign<MPRModel, LLTask> for DesignerFull
     {
         fn designer_name(&self) -> &str { super::ALGORITHM }
 
-        fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-            if !LLTasksetUtils::constrained_deadlines(taskset) {
+        fn check_preconditions(&self, taskset: &[LLTask]) -> Result<(), SchedError> {
+            if !Taskset::<LLTask>::constrained_deadlines(taskset) {
                 Err(SchedError::constrained_deadlines())
             } else {
                 Ok(())
             }
         }
 
-        fn run_designer(&self, taskset: &[T]) -> Result<MPRModel, SchedError> {
+        fn run_designer(&self, taskset: &[LLTask]) -> Result<MPRModel, SchedError> {
             let min_processors =
                 num_processors_lower_bound(taskset);
 
@@ -424,7 +408,7 @@ pub mod extra {
                 concurrency_iter_fn: |_| Ok(Box::new(min_processors ..= max_processors)),
                 resource_iter_fn: |period, concurrency| {
                     let min_resource =
-                        LLTasksetUtils::total_utilization(taskset) * period;
+                        Taskset::<LLTask>::total_utilization(taskset) * period;
                     let max_resource = {
                         let designer = super::DesignerLinear { period, concurrency };
 
@@ -443,22 +427,20 @@ pub mod extra {
         }
     }
 
-    fn num_processors_lower_bound<T>(taskset: &[T]) -> u64
-        where T: task_traits::LLTask
+    fn num_processors_lower_bound(taskset: &[LLTask]) -> u64
     {
-        f64::ceil(LLTasksetUtils::total_utilization(taskset)) as u64
+        f64::ceil(Taskset::<LLTask>::total_utilization(taskset)) as u64
     }
 
     // Section 5.1, Lemma 4 [1]
-    fn num_processors_upper_bound<T>(taskset: &[T]) -> u64
-        where T: task_traits::LLTask
+    fn num_processors_upper_bound(taskset: &[LLTask]) -> u64
     {
         debug_assert!(!taskset.is_empty());
 
         let n = taskset.len() as u64;
 
         let den = taskset.iter()
-            .map(|task| task.get_deadline() - task.get_wcet())
+            .map(|task| task.deadline - task.wcet)
             .min()
             .unwrap();
 
@@ -467,7 +449,7 @@ pub mod extra {
         }
 
         let total_work: Time = taskset.iter()
-            .map(|task| task.get_wcet())
+            .map(|task| task.wcet)
             .sum();
 
         (total_work / den).ceil() as u64 + n
@@ -478,7 +460,7 @@ pub mod extra {
 
 #[test]
 pub fn simple_vs_optimized() {
-    use crate::task::test_utils::*;
+    use crate::utils::test_utils::*;
 
     let taskset = [
         new_ll_task(35, 90, 160),

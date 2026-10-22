@@ -19,7 +19,6 @@
 //!    Systems, June 2001, pp. 59–66. doi: 10.1109/EMRTS.2001.934000.
 
 use crate::prelude::*;
-use crate::prelude::task_traits::LLTaskUtils as _;
 
 const ALGORITHM: &str = "Fixed Priority RM Hyperbolic (Bini, Buttazzo, Buttazzo 2001)";
 
@@ -28,22 +27,21 @@ const ALGORITHM: &str = "Fixed Priority RM Hyperbolic (Bini, Buttazzo, Buttazzo 
 /// Refer to the [module](`self`) level documentation.
 pub struct Analysis;
 
-impl<T> SchedAnalysis<(), T> for Analysis
-    where T: task_traits::LLTask + task_traits::Priority
+impl SchedAnalysis<(), PriorityTask<LLTask>> for Analysis
 {
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-        if !LLTasksetUtils::implicit_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::implicit_deadlines(taskset) {
             Err(SchedError::implicit_deadlines())
-        } else if !LLTasksetUtils::rate_monotonic_priority_assignment(taskset) {
+        } else if !Taskset::<PriorityTask<LLTask>>::rate_monotonic_priority_assignment(taskset) {
             Err(SchedError::rate_monotonic())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
         // Theorem 1 [1]
         let bound: f64 =
             taskset.iter()

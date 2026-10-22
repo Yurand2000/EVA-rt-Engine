@@ -34,6 +34,8 @@ pub mod algorithms;
 
 /// Utility Functions
 pub mod utils {
+    pub mod test_utils;
+
     pub mod binary_search;
     pub mod fixpoint_search;
     pub mod sched_error;

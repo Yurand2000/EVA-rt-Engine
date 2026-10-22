@@ -123,7 +123,7 @@ pub fn is_schedulable_demand<T, FDem, FTime>(
     mut time_intervals_fn: FTime,
 ) -> bool
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         FDem: FnMut(&[T], Time) -> Time,
         FTime: FnMut(&[T]) -> Box<dyn Iterator<Item = Time>>,
 {
@@ -147,22 +147,23 @@ pub fn is_schedulable_response<T, FRTA>(
     mut rta_fn: FRTA,
 ) -> Result<Vec<Time>, anyhow::Error>
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         FRTA: FnMut(&[T], &T, Time) -> Time,
 {
     taskset.iter().enumerate()
-        .map(|(k, task_k)| {
+        .map(|(k, __task_k)| {
+            let task_k = __task_k.borrow();
             let response =
                 fixpoint_search_with_limit(
-                    task_k.get_wcet(),
-                    task_k.get_deadline() + Time::nanos(1.0),
+                    task_k.wcet,
+                    task_k.deadline + Time::nanos(1.0),
                     |response: &Time|
                         model.get_interval_from_supply(
-                            rta_fn(taskset, task_k, *response)
+                            rta_fn(taskset, __task_k, *response)
                         )
                 );
 
-            if response > task_k.get_deadline() {
+            if response > task_k.deadline {
                 return Err(anyhow::format_err!("Response time of task {k} is greater than its deadline."));
             } else {
                 return Ok(response);
@@ -182,7 +183,7 @@ pub fn generate_model_from_demand_linear<T, FDem, FTime>(
     time_intervals_fn: FTime,
 ) -> Option<PRModel>
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         FDem: Fn(&[T], Time) -> Time,
         FTime: Fn(&[T]) -> Box<dyn Iterator<Item = Time>>,
 {
@@ -218,14 +219,15 @@ pub fn generate_model_from_response_linear<T, FRTA>(
     rta_fn: FRTA,
 ) -> Option<PRModel>
     where
-        T: task_traits::LLTask,
+        T: std::borrow::Borrow<LLTask>,
         FRTA: Fn(&[T], &T, Time) -> Time,
 {
     let min_resource =
         taskset.iter()
-        .map(|task_k| {
-            let supply = rta_fn(taskset, task_k, task_k.get_period());
-            PRModel::get_resource_linear(supply, task_k.get_period(), model_period)
+        .map(|__task_k| {
+            let task_k = __task_k.borrow();
+            let supply = rta_fn(taskset, __task_k, task_k.period);
+            PRModel::get_resource_linear(supply, task_k.period, model_period)
         })
         .max()?;
 

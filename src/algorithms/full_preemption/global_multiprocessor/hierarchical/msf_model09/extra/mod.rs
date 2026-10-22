@@ -12,7 +12,7 @@ use super::{MSFModel, MSFServer};
 
 pub struct AnalysisGeneric<'a, Task, Server, FnW>
     where
-        Task: task_traits::LLTask,
+        Task: std::borrow::Borrow<LLTask>,
         Server: MSFServer,
         FnW: Fn(&[Task], &Task) -> Time,
 {
@@ -23,7 +23,7 @@ pub struct AnalysisGeneric<'a, Task, Server, FnW>
 
 impl<'a, Task, Server, FnW> SchedAnalysis<(), Task> for AnalysisGeneric<'a, Task, Server, FnW>
     where
-        Task: task_traits::LLTask,
+        Task: std::borrow::Borrow<LLTask>,
         Server: MSFServer,
         FnW: Fn(&[Task], &Task) -> Time,
 {
@@ -34,11 +34,12 @@ impl<'a, Task, Server, FnW> SchedAnalysis<(), Task> for AnalysisGeneric<'a, Task
         // Equation 33 [1]
         let schedulable =
             taskset.iter()
-                .all(|task_k| {
-                    let workload = (self.fnw)(taskset, task_k);
-                    let interference = self.model.interference(workload, task_k.get_deadline());
+                .all(|__task_k| {
+                    let task_k = __task_k.borrow();
+                    let workload = (self.fnw)(taskset, __task_k);
+                    let interference = self.model.interference(workload, task_k.deadline);
 
-                    task_k.get_wcet() + interference <= task_k.get_deadline()
+                    task_k.wcet + interference <= task_k.deadline
                 });
 
         SchedError::result_from_schedulable(schedulable)

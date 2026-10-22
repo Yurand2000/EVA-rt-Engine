@@ -23,21 +23,20 @@ pub struct Analysis<S>
     pub model: MSFModel<S>,
 }
 
-impl<T, S> SchedAnalysis<(), T> for Analysis<S>
-    where T: task_traits::LLTask + task_traits::Priority,
-          S: MSFServer
+impl<S> SchedAnalysis<(), PriorityTask<LLTask>> for Analysis<S>
+    where S: MSFServer
 {
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-        if LLTasksetUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
+        if Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else {
             Ok(())
         }
     }
 
-    fn run_test(&self, taskset: &[T]) -> Result<(), SchedError> {
+    fn run_test(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
         extra::AnalysisGeneric {
             model: &self.model,
             fnw: interference_upperbound,
@@ -47,19 +46,17 @@ impl<T, S> SchedAnalysis<(), T> for Analysis<S>
 }
 
 
-fn workload_upperbound<T>(task_i: &T, task_k: &T) -> Time
-    where T: task_traits::LLTask
+fn workload_upperbound(task_i: &PriorityTask<LLTask>, task_k: &PriorityTask<LLTask>) -> Time
 {
-    let w = task_k.get_deadline() + task_i.get_deadline() - task_i.get_wcet();
-    let n = f64::floor(w / task_i.get_period());
-    n * task_i.get_wcet() + Time::min(task_i.get_wcet(), w - n * task_i.get_period())
+    let w = task_k.deadline + task_i.deadline - task_i.wcet;
+    let n = f64::floor(w / task_i.period);
+    n * task_i.wcet + Time::min(task_i.wcet, w - n * task_i.period)
 }
 
-fn interference_upperbound<T>(taskset: &[T], task_k: &T) -> Time
-    where T: task_traits::LLTask + task_traits::Priority
+fn interference_upperbound(taskset: &[PriorityTask<LLTask>], task_k: &PriorityTask<LLTask>) -> Time
 {
     taskset.iter()
-        .filter(|task_i| task_i.get_priority() > task_k.get_priority() )
+        .filter(|task_i| task_i.priority > task_k.priority )
         .map(|task_i| workload_upperbound(task_i, task_k))
         .sum()
 }

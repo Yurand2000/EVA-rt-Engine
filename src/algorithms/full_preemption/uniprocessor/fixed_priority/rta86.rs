@@ -28,13 +28,12 @@ const ALGORITHM: &str = "RTA (Joseph & Pandya 1986)";
 /// - Worst-Case Response Times of each task.
 pub struct Analysis;
 
-impl<T> SchedAnalysis<Vec<Time>, T> for Analysis
-    where T: task_traits::LLTask + task_traits::Priority
+impl SchedAnalysis<Vec<Time>, PriorityTask<LLTask>> for Analysis
 {
     fn analyzer_name(&self) -> &str { ALGORITHM }
 
-    fn check_preconditions(&self, taskset: &[T]) -> Result<(), SchedError> {
-        if !LLTasksetUtils::constrained_deadlines(taskset) {
+    fn check_preconditions(&self, taskset: &[PriorityTask<LLTask>]) -> Result<(), SchedError> {
+        if !Taskset::<LLTask>::constrained_deadlines(taskset) {
             Err(SchedError::constrained_deadlines())
         } else if !avg_processing_load_is_met(taskset) {
             Err(SchedError::Precondition(Some(
@@ -44,7 +43,7 @@ impl<T> SchedAnalysis<Vec<Time>, T> for Analysis
         }
     }
 
-    fn run_test(&self, taskset: &[T]) -> Result<Vec<Time>, SchedError> {
+    fn run_test(&self, taskset: &[PriorityTask<LLTask>]) -> Result<Vec<Time>, SchedError> {
         taskset.iter().enumerate()
             .map(|(i, task)| {
                 let response_time = response_time(task, taskset);
@@ -62,10 +61,9 @@ impl<T> SchedAnalysis<Vec<Time>, T> for Analysis
 }
 
 // Condition 4 [1]
-fn avg_processing_load_is_met<T>(taskset: &[T]) -> bool
-    where T: task_traits::LLTask + task_traits::Priority
+fn avg_processing_load_is_met(taskset: &[PriorityTask<LLTask>]) -> bool
 {
-    let hyperperiod = LLTasksetUtils::hyperperiod(taskset);
+    let hyperperiod = Taskset::<LLTask>::hyperperiod(taskset);
 
     taskset.iter()
         .map(|task| required_resources_over_interval(task, hyperperiod))
@@ -75,29 +73,27 @@ fn avg_processing_load_is_met<T>(taskset: &[T]) -> bool
 }
 
 // Function 3 + Function 2 [1]
-fn required_resources_over_interval<T>(task: &T, interval: Time) -> Time
-    where T: task_traits::LLTask + task_traits::Priority
+fn required_resources_over_interval(task: &PriorityTask<LLTask>, interval: Time) -> Time
 {
-    f64::ceil(interval / task.get_period()) * task.get_wcet()
+    f64::ceil(interval / task.period) * task.wcet
 }
 
 // Equation 6 + Function 5 [1]
-fn response_time<T>(task: &T, taskset: &[T]) -> Option<Time>
-    where T: task_traits::LLTask + task_traits::Priority
+fn response_time(task: &PriorityTask<LLTask>, taskset: &[PriorityTask<LLTask>]) -> Option<Time>
 {
     debug_assert!(!taskset.is_empty());
 
     let response_time =
-        fixpoint_search_with_limit(task.get_wcet(), task.get_deadline() + Time::one(), |response| {
+        fixpoint_search_with_limit(task.wcet, task.deadline + Time::one(), |response| {
             taskset.iter()
-                .filter(|other| task.get_priority() > other.get_priority())
+                .filter(|other| task.priority > other.priority)
                 .map(|hp_task| required_resources_over_interval(hp_task, *response))
                 .sum::<Time>()
                 +
-                task.get_wcet()
+                task.wcet
         });
 
-    if response_time <= task.get_deadline() {
+    if response_time <= task.deadline {
         Some(response_time)
     } else {
         None
@@ -107,7 +103,7 @@ fn response_time<T>(task: &T, taskset: &[T]) -> Option<Time>
 #[test]
 // Example 2 [1]
 fn example_2() {
-    use crate::task::test_utils::*;
+    use crate::utils::test_utils::*;
 
     let taskset = [
         new_prio_task(40, 100, 100, 0),
