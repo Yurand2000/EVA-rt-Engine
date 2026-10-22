@@ -8,6 +8,8 @@ pub mod prelude {
     };
 }
 
+#[derive(Debug, Clone)]
+#[derive(PartialEq, Eq)]
 pub struct PriorityTask<Task> {
     pub task: Task,
     pub priority: usize,
@@ -39,6 +41,8 @@ impl<Task> std::borrow::BorrowMut<Task> for PriorityTask<Task> {
     }
 }
 
+#[derive(Debug, Clone)]
+#[derive(PartialEq, Eq)]
 pub struct LLTask {
     pub wcet: Time,
     pub deadline: Time,
