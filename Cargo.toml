@@ -8,6 +8,7 @@ anyhow = "1.0.102"
 itertools = "0.14.0"
 libtux = { git = "https://github.com/Yurand2000/libtux", tag = "version-0.1.1", default-features = false, features = [
 	"serde",
+	"time",
 	"time_extra",
 	"time_iterators",
 ] }

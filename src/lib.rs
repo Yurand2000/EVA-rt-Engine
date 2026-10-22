@@ -17,7 +17,7 @@ pub mod prelude {
     pub use libtux::prelude::{
         Time,
         Time2,
-        TimeIterators,
+        time::Iterators as TimeIterators,
     };
     pub use super::task::prelude::*;
     pub use super::utils::{
