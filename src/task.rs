@@ -134,8 +134,8 @@ impl Taskset<PriorityTask<LLTask>> {
         while let Some(task_i) = taskset.next() {
             if taskset.clone().any(|task_j|
                 (task_i.priority == task_j.priority) ||
-                (task_i.period < task_j.period && task_i.priority > task_j.priority) ||
-                (task_i.period > task_j.period && task_i.priority < task_j.priority)
+                (task_i.period > task_j.period && task_i.priority > task_j.priority) ||
+                (task_i.period < task_j.period && task_i.priority < task_j.priority)
             ) {
                 return false;
             }
@@ -152,8 +152,8 @@ impl Taskset<PriorityTask<LLTask>> {
         while let Some(task_i) = taskset.next() {
             if taskset.clone().any(|task_j|
                 (task_i.priority == task_j.priority) ||
-                (task_i.deadline < task_j.deadline && task_i.priority > task_j.priority) ||
-                (task_i.deadline > task_j.deadline && task_i.priority < task_j.priority)
+                (task_i.deadline > task_j.deadline && task_i.priority > task_j.priority) ||
+                (task_i.deadline < task_j.deadline && task_i.priority < task_j.priority)
             ) {
                 return false;
             }
